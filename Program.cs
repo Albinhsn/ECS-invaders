@@ -2,11 +2,52 @@
 using SFML.Graphics;
 using SFML.System;
 
+public class GameState
+{
+
+}
+
+public class Input
+{
+
+}
+
+public class Renderer
+{
+  // retrieve position and sprite
+  // render all the things
+
+}
+
+public class Physics
+{
+  // retrieve every unit with position and physics
+  // update their position
+  //  retrieve enemies with reflect thingy
+  
+  // send collision detection queries for the units and resolve
+  //  take damage 
+
+}
+
+
+public class EnemyManager
+{
+  // Spawn enemies
+  // Shoot bullets
+}
+
+public class CollisionDetection
+{
+
+}
 
 public struct HealthComponent
 {
   int hp;
+  bool damageTaken;
 }
+
 public struct PositionComponent
 {
   float x;
@@ -19,16 +60,18 @@ public struct InputComponent
   Keyboard.Key[] keysReleased;
 }
 
-public struct SpriteComponent
+public struct RenderComponent
 {
   Texture texture;
-
+  float alpha;
 }
+
 public struct VelocityComponent
 {
   float x;
   float y;
 }
+
 public struct ColliderComponent
 {
   float width;
@@ -50,11 +93,6 @@ public class ECS
     return new();
   }
 
-}
-
-public abstract class Entity
-{
-  public abstract void Create(ECS ecs);
 }
 
 public class Program
