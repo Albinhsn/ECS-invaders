@@ -4,6 +4,9 @@
 #include <windows.h>
 #include <stdio.h>
 
+static int ScreenWidth = 800;
+static int ScreenHeight = 600;
+
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
   switch (uMsg)
@@ -49,7 +52,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
                                                WindowClassName,                                            // Window class
                                                L"Window Text",                                              // Window text
                                                WS_OVERLAPPEDWINDOW,                                        // Window style
-                                               CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, // Size and position
+                                               CW_USEDEFAULT, CW_USEDEFAULT, ScreenWidth, ScreenHeight, // Size and position
                                                NULL,                                                       // Parent Window
                                                NULL,                                                       // Menu
                                                hInstance,                                                  // Instance handle
@@ -62,6 +65,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   }
 
   ShowWindow(hwnd, nCmdShow);
+
+  // Allocate some amount of memory :)
+
+  // Game loop time
 
   MSG msg = {};
   while (GetMessage(&msg, NULL, 0, 0) > 0)

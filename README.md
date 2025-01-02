@@ -1,6 +1,9 @@
 # Invaders
-Doing a basic invaders to teach myself ECS, D3D and win32
+Doing a basic invaders to teach myself ECS and win32
 
 # ToDo
-* Get a window up with d3d
-* Render a triangle
+* Disallow resizing the window
+* Create a buffer that will be drawn each frame
+* Let every frame be 1/60 of a second
+* Allocate all the game memory 
+* Call out to the game code
