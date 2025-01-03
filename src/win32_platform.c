@@ -1,11 +1,15 @@
-#ifndef UNICODE
-#define UNICODE
-#endif
-#include <windows.h>
+#include "common.h"
 #include <stdio.h>
+#include <windows.h>
 
-static int ScreenWidth = 800;
-static int ScreenHeight = 600;
+static int   ScreenWidth  = 800;
+static int   ScreenHeight = 600;
+
+static void* Win32_Allocate(u64 size)
+{
+  // Align the memory?
+  return VirtualAlloc(0, size, MEM_RESERVE |MEM_COMMIT, PAGE_READWRITE);
+}
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -38,7 +42,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
 
-    const wchar_t WindowClassName[]  = L"Sample Window Class";
+  const char* WindowClassName = "indow Class";
 
   WNDCLASS    wc              = {};
 
@@ -48,16 +52,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   RegisterClass(&wc);
 
-  HWND hwnd                   = CreateWindowEx(0,                                                          // Optional window styles
-                                               WindowClassName,                                            // Window class
-                                               L"Window Text",                                              // Window text
-                                               WS_OVERLAPPEDWINDOW,                                        // Window style
-                                               CW_USEDEFAULT, CW_USEDEFAULT, ScreenWidth, ScreenHeight, // Size and position
-                                               NULL,                                                       // Parent Window
-                                               NULL,                                                       // Menu
-                                               hInstance,                                                  // Instance handle
-                                               NULL                                                        // Additional application data
-                    );
+  HWND hwnd = CreateWindowEx(0,                                                       // Optional window styles
+                             WindowClassName,                                         // Window class
+                             "Window Text",                                           // Window text
+                             WS_OVERLAPPEDWINDOW,                                     // Window style
+                             CW_USEDEFAULT, CW_USEDEFAULT, ScreenWidth, ScreenHeight, // Size and position
+                             NULL,                                                    // Parent Window
+                             NULL,                                                    // Menu
+                             hInstance,                                               // Instance handle
+                             NULL                                                     // Additional application data
+  );
 
   if (hwnd == NULL)
   {
@@ -67,14 +71,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   ShowWindow(hwnd, nCmdShow);
 
   // Allocate some amount of memory :)
+  void * Memory = Win32_Allocate(Gigabyte(1));
 
   // Game loop time
 
-  MSG msg = {};
-  while (GetMessage(&msg, NULL, 0, 0) > 0)
+  MSG Msg = {};
+  while (GetMessage(&Msg, NULL, 0, 0) > 0)
   {
-    TranslateMessage(&msg);
-    DispatchMessage(&msg);
+    TranslateMessage(&Msg);
+    DispatchMessage(&Msg);
   }
 
   return 0;

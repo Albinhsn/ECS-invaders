@@ -1,5 +1,5 @@
 
-#ifndef WIN32_PLATFORM
-#define WIN32_PLATFORM
+#ifndef WIN32_PLATFORM_H
+#define WIN32_PLATFORM_H
 
 #endif
