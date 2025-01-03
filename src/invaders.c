@@ -1,6 +1,7 @@
-#include "platform.c"
-#include "pushbuffer.h"
+#include "platform.h"
+#include "pushbuffer.c"
 
-void Update(game_memory* Memory, game_input* Input, pushbuffer* PushBuffer)
+GAME_UPDATE(GameUpdate)
 {
+  Pushbuffer_PushClear(Pushbuffer, 0xFF00FF00);
 }

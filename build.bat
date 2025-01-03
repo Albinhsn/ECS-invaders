@@ -12,7 +12,7 @@ del *.pdb > NUL 2> NUL
 del *.rdi > NUL 2> NUL
 REM 64-bit build
 echo WAITING FOR PDB > lock.tmp
-REM cl %CommonCompilerFlags%  ..\src\handmade.cpp -Fmhandmade.map -LD /link -incremental:no -opt:ref -PDB:handmade_%random%.pdb -EXPORT:GameGetSoundSamples -EXPORT:GameUpdateAndRender
+cl %CommonCompilerFlags%  ..\src\invaders.c -Fminvaders.map -LD /link -incremental:no -opt:ref -PDB:invaders_%random%.pdb -EXPORT:GameUpdate
 del lock.tmp
 cl %CommonCompilerFlags% ..\src\win32_platform.c  /link %CommonLinkerFlags%
 popd

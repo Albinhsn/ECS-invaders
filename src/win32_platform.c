@@ -29,15 +29,35 @@ static void Win32_Create_Renderer(win32_software_renderer* Renderer, arena* Game
   Renderer->Info.bmiHeader.biCompression = BI_RGB;
 }
 
-void Win32_LoadGameCode(){
-
+void* Win32_LibraryLoad(const char* LibraryName)
+{
+  return (void*)LoadLibraryA(LibraryName);
+}
+void Win32_LibraryFree(void* LibraryHandle)
+{
+  (void)FreeLibrary((HMODULE)LibraryHandle);
+}
+void* Win32_GetProcAddress(void* LibraryHandle, const char* ProcName)
+{
+  return (void*)GetProcAddress((HMODULE)LibraryHandle, ProcName);
 }
 
-void Win32_RenderFramebuffer(HDC hdc)
+void Win32_LoadGameCode(win32_game_code* GameCode)
+{
+  const char* LibraryPath   = "../build/invaders.dll";
+  void*       GameCodeDLL   = Win32_LibraryLoad(LibraryPath);
+
+  void*       UpdateAddress = Win32_GetProcAddress(GameCodeDLL, "GameUpdate");
+  GameCode->GameUpdate      = (game_update*)UpdateAddress;
+}
+
+void Win32_RenderFramebuffer(HWND hwnd)
 {
 
+  HDC               hdc      = GetDC(hwnd);
   software_renderer Renderer = GlobalRenderer.Renderer;
   StretchDIBits(hdc, 0, 0, GlobalScreenWidth, GlobalScreenHeight, 0, 0, Renderer.Width, Renderer.Height, Renderer.Buffer, &GlobalRenderer.Info, DIB_RGB_COLORS, SRCCOPY);
+  ReleaseDC(hwnd, hdc);
 }
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -61,7 +81,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
     PAINTSTRUCT ps;
     HDC         hdc = BeginPaint(hwnd, &ps);
 
-    Win32_RenderFramebuffer(hdc);
+    Win32_RenderFramebuffer(hwnd);
 
     EndPaint(hwnd, &ps);
     return 0;
@@ -128,27 +148,38 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   u64   GameMemorySize = Gigabyte(1);
   void* Memory         = Win32_Allocate(GameMemorySize);
 
-  arena GameMemory     = {};
-  Arena_Create(&GameMemory, Memory, GameMemorySize);
+  arena GameArena      = {};
+  Arena_Create(&GameArena, Memory, GameMemorySize);
 
-  Win32_Create_Renderer(&GlobalRenderer, &GameMemory);
+  Win32_Create_Renderer(&GlobalRenderer, &GameArena);
 
   Software_Renderer_Clear(&GlobalRenderer.Renderer, 0xFF00FFFF);
 
   LARGE_INTEGER PerfCountFrequencyResult;
   QueryPerformanceFrequency(&PerfCountFrequencyResult);
-  GlobalPerfCountFrequency        = PerfCountFrequencyResult.QuadPart;
+  GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
+
+  win32_game_code GameCode = {};
+  Win32_LoadGameCode(&GameCode);
+
+  pushbuffer Pushbuffer           = {};
+  u64        PushbufferMemorySize = Megabyte(1);
+  void*      PushbufferMemory     = Arena_Allocate(&GameArena, PushbufferMemorySize);
+  Pushbuffer_Create(&Pushbuffer, PushbufferMemory, PushbufferMemorySize);
+
+  game_memory   GameMemory        = {};
+  game_input    GameInput         = {};
 
   LARGE_INTEGER PreviousTimer     = GetTimeInMilliseconds();
   u32           TargetFrameTimeMS = 32;
   while (!GlobalShouldQuit)
   {
     Win32_ProcessMessages();
-    Software_Renderer_Clear(&GlobalRenderer.Renderer, 0x00FF00FF);
+    Pushbuffer_Reset(&Pushbuffer);
+    GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
 
-    HDC hdc = GetDC(hwnd);
-    Win32_RenderFramebuffer(hdc);
-    ReleaseDC(hwnd, hdc);
+    Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);
+    Win32_RenderFramebuffer(hwnd);
 
     LARGE_INTEGER CurrentTimer = GetTimeInMilliseconds();
     u32           FrameTimeMS  = GetMillisecondsElapsed(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
