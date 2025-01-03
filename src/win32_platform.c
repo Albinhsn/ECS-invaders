@@ -11,10 +11,30 @@ static s64                     GlobalPerfCountFrequency;
 
 static win32_software_renderer GlobalRenderer;
 
+static const char * GlobalTempPath = "../build/lock.tmp";
+static const char * GlobalLibraryPath = "../build/invaders.dll";
+
 static void*                   Win32_Allocate(u64 size)
 {
   // ToDo Align the memory?
   return VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+}
+u32 Win32_FileHasChanged(u64* FileLastChangedTimer, const char* Filename)
+{
+
+  WIN32_FILE_ATTRIBUTE_DATA AttributeData;
+  if (GetFileAttributesEx(Filename, GetFileExInfoStandard, &AttributeData))
+  {
+    FILETIME LastFileTimeChanged = {};
+    LastFileTimeChanged          = AttributeData.ftLastWriteTime;
+    long LastChanged             = LastFileTimeChanged.dwLowDateTime | (((uint64_t)AttributeData.ftLastWriteTime.dwHighDateTime) << 32);
+    if (*FileLastChangedTimer != LastChanged)
+    {
+      *FileLastChangedTimer = LastChanged;
+      return 1;
+    }
+  }
+  return 0;
 }
 
 static void Win32_Create_Renderer(win32_software_renderer* Renderer, arena* GameMemory)
@@ -42,12 +62,20 @@ void* Win32_GetProcAddress(void* LibraryHandle, const char* ProcName)
   return (void*)GetProcAddress((HMODULE)LibraryHandle, ProcName);
 }
 
+void Win32_FreeGameCode(win32_game_code* GameCode)
+{
+  Win32_LibraryFree(GameCode->Library);
+  GameCode->Library = 0;
+  GameCode->GameUpdate      = 0;
+}
 void Win32_LoadGameCode(win32_game_code* GameCode)
 {
-  const char* LibraryPath   = "../build/invaders.dll";
-  void*       GameCodeDLL   = Win32_LibraryLoad(LibraryPath);
+  
+  CopyFile(GlobalLibraryPath, GlobalTempPath, FALSE);
+  void*       GameCodeDLL   = Win32_LibraryLoad(GlobalTempPath);
 
   void*       UpdateAddress = Win32_GetProcAddress(GameCodeDLL, "GameUpdate");
+  GameCode->Library = GameCodeDLL;
   GameCode->GameUpdate      = (game_update*)UpdateAddress;
 }
 
@@ -159,6 +187,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   win32_game_code GameCode = {};
   Win32_LoadGameCode(&GameCode);
+  u64 GameCodeLastChanged = 0;
+  Win32_FileHasChanged(&GameCodeLastChanged, "../build/invaders.dll");
 
   pushbuffer Pushbuffer           = {};
   u64        PushbufferMemorySize = Megabyte(1);
@@ -177,8 +207,15 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   u32           TargetFrameTimeMS = 33;
   while (!GlobalShouldQuit)
   {
+    if(Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath)){
+      Win32_FreeGameCode(&GameCode);
+      Win32_LoadGameCode(&GameCode);
+    }
+
     Win32_ProcessMessages();
     Pushbuffer_Reset(&Pushbuffer);
+
+
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
 
     Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);

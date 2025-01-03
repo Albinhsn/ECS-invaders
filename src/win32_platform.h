@@ -14,6 +14,7 @@ typedef struct win32_software_renderer
 
 typedef struct win32_game_code{
   game_update * GameUpdate;
+  void * Library;
 }win32_game_code;
 
 #endif
