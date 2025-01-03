@@ -42,6 +42,18 @@ pushbuffer_entry_type Pushbuffer_ReadEntryType(pushbuffer* Pushbuffer)
 
   return Type;
 }
+void Pushbuffer_Push_Rect_Color(pushbuffer* Pushbuffer, vec2i Min, vec2i Max, u32 Color)
+{
+
+  Pushbuffer_CheckSpace(Pushbuffer, sizeof(pushbuffer_entry_rect_color));
+
+  pushbuffer_entry_rect_color Entry = {};
+  Entry.Color                       = Color;
+  Entry.Min                         = Min;
+  Entry.Max                         = Max;
+  Pushbuffer_Write(Pushbuffer, Pushbuffer_Entry_Rect_Color, pushbuffer_entry_type);
+  Pushbuffer_Write(Pushbuffer, Entry, pushbuffer_entry_rect_color);
+}
 
 void Pushbuffer_PushClear(pushbuffer* Pushbuffer, u32 Color)
 {

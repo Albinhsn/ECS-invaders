@@ -23,7 +23,7 @@ static void Win32_Create_Renderer(win32_software_renderer* Renderer, arena* Game
   Software_Renderer_Create(&Renderer->Renderer, Buffer, GlobalScreenWidth, GlobalScreenHeight);
   Renderer->Info.bmiHeader.biSize        = sizeof(Renderer->Info.bmiHeader);
   Renderer->Info.bmiHeader.biWidth       = Renderer->Renderer.Width;
-  Renderer->Info.bmiHeader.biHeight      = Renderer->Renderer.Height;
+  Renderer->Info.bmiHeader.biHeight      = -Renderer->Renderer.Height;
   Renderer->Info.bmiHeader.biPlanes      = 1;
   Renderer->Info.bmiHeader.biBitCount    = 32;
   Renderer->Info.bmiHeader.biCompression = BI_RGB;

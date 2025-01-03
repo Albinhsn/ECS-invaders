@@ -12,7 +12,7 @@ void Software_Renderer_Clear(software_renderer* Renderer, u32 Color)
 {
 
   u64 BufferSize = Renderer->Width * Renderer->Height;
-  for (int i = 0; i < BufferSize; i++)
+  for (s32 i = 0; i < BufferSize; i++)
   {
     Renderer->Buffer[i] = Color;
   }
@@ -29,6 +29,31 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
     {
       pushbuffer_entry_clear Entry = Pushbuffer_Read(Pushbuffer, pushbuffer_entry_clear);
       Software_Renderer_Clear(Renderer, Entry.Color);
+      break;
+    }
+    case Pushbuffer_Entry_Rect_Color:
+    {
+      u32                         Width  = Renderer->Width;
+      u32                         Height = Renderer->Height;
+      pushbuffer_entry_rect_color Entry  = Pushbuffer_Read(Pushbuffer, pushbuffer_entry_rect_color);
+
+      u32                         MinX   = Entry.Min.X < 0 ? 0 : Entry.Min.X;
+      u32                         MinY   = Entry.Min.Y < 0 ? 0 : Entry.Min.Y;
+
+      u32                         MaxX   = Entry.Max.X > Width ? Width : Entry.Max.X;
+      u32                         MaxY   = Entry.Max.Y > Height ? Height : Entry.Max.Y;
+
+      u32*                        Buffer = Renderer->Buffer;
+
+      u32                         Color  = Entry.Color;
+      for (u32 Y = MinY; Y < MaxY; Y++)
+      {
+        for (u32 X = MinX; X < MaxX; X++)
+        {
+          *(Buffer + Y * Width + X) = Color;
+        }
+      }
+
       break;
     }
     default:
