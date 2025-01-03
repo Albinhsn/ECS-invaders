@@ -19,4 +19,43 @@ typedef double   f64;
 #define Megabyte(size) (Kilobyte(size) * 1024LL)
 #define Gigabyte(size) (Megabyte(size) * 1024LL)
 
+typedef struct arena
+{
+  void* Memory;
+  u64   Size;
+  u64   Offset;
+} arena;
+
+void Arena_Create(arena * Arena, void * Memory,u64 Size)
+{
+  Arena->Memory = Memory;
+  Arena->Size = Size;
+  Arena->Offset = 0;
+}
+
+void * Arena_Allocate(arena * Arena, u64 Size)
+{
+
+  // ToDo Check this?
+  void * Pointer = (void*)((u8*)Arena->Memory + Arena->Offset);
+  Arena->Offset += Size;
+
+  return Pointer;
+
+}
+
+void Arena_Reset(arena * Arena){
+  Arena->Offset = 0;
+}
+void Arena_Clear(arena * Arena)
+{
+  Arena_Reset(Arena);
+  u8 * Memory=  (u8*)Arena->Memory;
+  for(int i = 0; i < Arena->Size; i++){
+    Memory[i] = 0;
+  }
+}
+
+
+
 #endif
