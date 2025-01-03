@@ -1,5 +1,14 @@
 #include "pushbuffer.h"
 #include "common.h"
+
+void Pushbuffer_CheckSpace(pushbuffer* Pushbuffer, u64 Size)
+{
+  if (Pushbuffer->AllocatedOffset + Size > Pushbuffer->Size)
+  {
+    Assert(0 && "Writing outside of the pushbuffer!");
+  }
+}
+
 void Pushbuffer_Create(pushbuffer* Pushbuffer, void* Memory, u64 Size)
 {
   Pushbuffer->AllocatedOffset = 0;
@@ -19,7 +28,7 @@ void Pushbuffer_Reset(pushbuffer* Pushbuffer)
 }
 
 #define Pushbuffer_Write(Pushbuffer, Entry, EntryType)                                                                                                                                                 \
-  *(EntryType*)((u8*)Pushbuffer->Memory + Pushbuffer->AllocatedOffset) = Entry;                                                                                                                             \
+  *(EntryType*)((u8*)Pushbuffer->Memory + Pushbuffer->AllocatedOffset) = Entry;                                                                                                                        \
   Pushbuffer->AllocatedOffset += sizeof(EntryType);
 
 #define Pushbuffer_Read(Pushbuffer, Entry)                                                                                                                                                             \
@@ -36,6 +45,8 @@ pushbuffer_entry_type Pushbuffer_ReadEntryType(pushbuffer* Pushbuffer)
 
 void Pushbuffer_PushClear(pushbuffer* Pushbuffer, u32 Color)
 {
+
+  Pushbuffer_CheckSpace(Pushbuffer, sizeof(pushbuffer_entry_clear));
 
   pushbuffer_entry_clear Entry = {};
   Entry.Color                  = Color;

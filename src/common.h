@@ -1,6 +1,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include "windows.h"
+#include <stdio.h>
 #include <stdint.h>
 typedef uint8_t  u8;
 typedef uint16_t u16;
@@ -18,6 +20,11 @@ typedef double   f64;
 #define Kilobyte(size) (size * 1024LL)
 #define Megabyte(size) (Kilobyte(size) * 1024LL)
 #define Gigabyte(size) (Megabyte(size) * 1024LL)
+#define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
+
+#define Assert(Expr)                                                                                                                                                                                   \
+  if (!Expr)                                                                                                                                                                                           \
+    int a = *(int*)0;
 
 typedef struct arena
 {
@@ -36,9 +43,16 @@ void Arena_Create(arena* Arena, void* Memory, u64 Size)
 void* Arena_Allocate(arena* Arena, u64 Size)
 {
 
-  // ToDo Check this?
+  if (Arena->Offset + Size > Arena->Size)
+  {
+    Assert(0 && "Allocated outside of the arena!");
+  }
+
   void* Pointer = (void*)((u8*)Arena->Memory + Arena->Offset);
   Arena->Offset += Size;
+  char Buffer[1024] = {};
+  sprintf_s(Buffer, ArrayCount(Buffer),"Allocated %lld out of %lld (%.2f)\n", Arena->Offset, Arena->Size, Arena->Offset / (f32)Arena->Size);
+  OutputDebugStringA(Buffer);
 
   return Pointer;
 }
@@ -57,8 +71,5 @@ void Arena_Clear(arena* Arena)
   }
 }
 
-#define Assert(Expr)                                                                                                                                                                                   \
-  if (!Expr)                                                                                                                                                                                           \
-    int a = *(int*)0;
 
 #endif

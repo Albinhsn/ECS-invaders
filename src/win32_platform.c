@@ -145,15 +145,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   ShowWindow(hwnd, nCmdShow);
 
-  u64   GameMemorySize = Gigabyte(1);
+  u64   GameMemorySize = Megabyte(205);
   void* Memory         = Win32_Allocate(GameMemorySize);
 
   arena GameArena      = {};
   Arena_Create(&GameArena, Memory, GameMemorySize);
 
   Win32_Create_Renderer(&GlobalRenderer, &GameArena);
-
-  Software_Renderer_Clear(&GlobalRenderer.Renderer, 0xFF00FFFF);
 
   LARGE_INTEGER PerfCountFrequencyResult;
   QueryPerformanceFrequency(&PerfCountFrequencyResult);
@@ -167,11 +165,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   void*      PushbufferMemory     = Arena_Allocate(&GameArena, PushbufferMemorySize);
   Pushbuffer_Create(&Pushbuffer, PushbufferMemory, PushbufferMemorySize);
 
-  game_memory   GameMemory        = {};
+  game_memory GameMemory          = {};
+  GameMemory.TemporarySize        = Megabyte(100);
+  GameMemory.TemporaryStorage     = Arena_Allocate(&GameArena, GameMemory.TemporarySize);
+  GameMemory.TransientStorageSize = Megabyte(100);
+  GameMemory.TransientStorage     = Arena_Allocate(&GameArena, GameMemory.TransientStorageSize);
+
   game_input    GameInput         = {};
 
   LARGE_INTEGER PreviousTimer     = GetTimeInMilliseconds();
-  u32           TargetFrameTimeMS = 32;
+  u32           TargetFrameTimeMS = 33;
   while (!GlobalShouldQuit)
   {
     Win32_ProcessMessages();
