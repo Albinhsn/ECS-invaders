@@ -5,12 +5,20 @@
 
 typedef struct vec2i
 {
-  u32 X;
-  u32 Y;
+  s32 X;
+  s32 Y;
 } vec2i;
+typedef struct vec2f
+{
+  f32 X;
+  f32 Y;
+} vec2f;
 
-vec2i V2(u32 X, u32 Y){
+vec2i V2i(u32 X, u32 Y){
   return (vec2i){X, Y};
+}
+vec2f V2f(f32 X, f32 Y){
+  return (vec2f){X, Y};
 }
 
 #endif

@@ -33,8 +33,8 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
     }
     case Pushbuffer_Entry_Rect_Color:
     {
-      u32                         Width  = Renderer->Width;
-      u32                         Height = Renderer->Height;
+      s32                         Width  = Renderer->Width;
+      s32                         Height = Renderer->Height;
       pushbuffer_entry_rect_color Entry  = Pushbuffer_Read(Pushbuffer, pushbuffer_entry_rect_color);
 
       u32                         MinX   = Entry.Min.X < 0 ? 0 : Entry.Min.X;

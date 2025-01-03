@@ -11,8 +11,8 @@ static s64                     GlobalPerfCountFrequency;
 
 static win32_software_renderer GlobalRenderer;
 
-static const char * GlobalTempPath = "../build/lock.tmp";
-static const char * GlobalLibraryPath = "../build/invaders.dll";
+static const char*             GlobalTempPath    = "../build/lock.tmp";
+static const char*             GlobalLibraryPath = "../build/invaders.dll";
 
 static void*                   Win32_Allocate(u64 size)
 {
@@ -65,18 +65,18 @@ void* Win32_GetProcAddress(void* LibraryHandle, const char* ProcName)
 void Win32_FreeGameCode(win32_game_code* GameCode)
 {
   Win32_LibraryFree(GameCode->Library);
-  GameCode->Library = 0;
-  GameCode->GameUpdate      = 0;
+  GameCode->Library    = 0;
+  GameCode->GameUpdate = 0;
 }
 void Win32_LoadGameCode(win32_game_code* GameCode)
 {
-  
-  CopyFile(GlobalLibraryPath, GlobalTempPath, FALSE);
-  void*       GameCodeDLL   = Win32_LibraryLoad(GlobalTempPath);
 
-  void*       UpdateAddress = Win32_GetProcAddress(GameCodeDLL, "GameUpdate");
-  GameCode->Library = GameCodeDLL;
-  GameCode->GameUpdate      = (game_update*)UpdateAddress;
+  CopyFile(GlobalLibraryPath, GlobalTempPath, FALSE);
+  void* GameCodeDLL    = Win32_LibraryLoad(GlobalTempPath);
+
+  void* UpdateAddress  = Win32_GetProcAddress(GameCodeDLL, "GameUpdate");
+  GameCode->Library    = GameCodeDLL;
+  GameCode->GameUpdate = (game_update*)UpdateAddress;
 }
 
 void Win32_RenderFramebuffer(HWND hwnd)
@@ -118,13 +118,59 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
   return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
-void Win32_ProcessMessages()
+void Win32_ProcessMessages(game_input* Input)
 {
   MSG Msg = {};
   while (PeekMessage(&Msg, 0, 0, 0, PM_REMOVE))
   {
-    TranslateMessage(&Msg);
-    DispatchMessage(&Msg);
+    switch (Msg.message)
+    {
+    case WM_KEYUP:
+    case WM_KEYDOWN:
+    case WM_SYSKEYUP:
+    case WM_SYSKEYDOWN:
+    {
+      WORD VKCode  = LOWORD(Msg.wParam);
+      u32  WasDown = ((Msg.lParam & (1 << 30)) != 0);
+      u32  IsDown  = ((Msg.lParam & (1 << 31)) == 0);
+      switch (VKCode)
+      {
+      case VK_SPACE:
+      {
+        Input->Shoot = IsDown;
+        break;
+      }
+      case 'W':
+      {
+        Input->Up = IsDown;
+        break;
+      }
+      case 'A':
+      {
+        Input->Left = IsDown;
+        break;
+      }
+      case 'S':
+      {
+        Input->Down = IsDown;
+        break;
+      }
+      case 'D':
+      {
+        Input->Right = IsDown;
+        break;
+      }
+      }
+      break;
+    }
+    default:
+    {
+
+      TranslateMessage(&Msg);
+      DispatchMessage(&Msg);
+      break;
+    }
+    }
   }
 }
 
@@ -207,14 +253,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   u32           TargetFrameTimeMS = 33;
   while (!GlobalShouldQuit)
   {
-    if(Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath)){
+    if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath))
+    {
       Win32_FreeGameCode(&GameCode);
       Win32_LoadGameCode(&GameCode);
     }
 
-    Win32_ProcessMessages();
+    Win32_ProcessMessages(&GameInput);
     Pushbuffer_Reset(&Pushbuffer);
-
 
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
 

@@ -16,7 +16,11 @@ typedef struct game_memory
 
 typedef struct game_input
 {
-  u32 placeholder;
+  u32 Up;
+  u32 Left;
+  u32 Right;
+  u32 Down;
+  u32 Shoot;
 
 } game_input;
 

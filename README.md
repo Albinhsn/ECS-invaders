@@ -1,13 +1,26 @@
 # Invaders
-Doing a basic invaders to teach myself ECS and win32
+Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading
 
 
 # ToDo
-* Load the game code dynamically on file change!
-* Handle input
-    * This is messages for keys!
-    * Mouse seems to be queried on it's own
-* Move around the player
 * Load Targa Files
 * Draw Rect Texture
+
+* ECS
+    * Collision detection
+    * Bullets
+    * Enemies
+
+* UI 
+    * Button
+    * Text 
+
+* Audio
+    * Shoot Bullet
+    * Take Damage / Explosion
+
+* Additional Things 
+    * SIMD 
+    * Work Queue
+
 * Fully hoist the software_renderer out of the win32_software_renderer and just recreate when neccessary
