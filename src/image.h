@@ -19,4 +19,5 @@ typedef struct targa_image
   u32          Height;
 } targa_image;
 
+
 #endif

@@ -5,8 +5,8 @@
 #include "renderer_software.c"
 #include "win32_platform.h"
 
-static u16                     GlobalScreenWidth  = 800;
-static u16                     GlobalScreenHeight = 600;
+static u16                     GlobalScreenWidth  = 600;
+static u16                     GlobalScreenHeight = 800;
 static s32                     GlobalShouldQuit   = 0;
 static s64                     GlobalPerfCountFrequency;
 
@@ -268,7 +268,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   arena GameArena      = {};
   Arena_Create(&GameArena, Memory, GameMemorySize);
 
-  const char* Filename   = "../assets/filledHeart.tga";
+  const char* Filename   = "../assets/spaceShips_001.tga";
   u8*         FileBuffer = {};
   u32         Size;
   Win32ReadFile(&GameArena, Filename, &FileBuffer, &Size);

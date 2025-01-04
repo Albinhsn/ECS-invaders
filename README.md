@@ -3,13 +3,14 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading
 
 
 # ToDo
-* Load Targa Files
-* Draw Rect Texture
+
+* Asset loading
+    * Just store uncompressed assets from a pool inside the renderer
+    * Load at the start and refer to them at by idx
 
 * ECS
-    * Collision detection
-    * Bullets
-    * Enemies
+    * Create Entity
+    * Query Components
 
 * UI 
     * Button
