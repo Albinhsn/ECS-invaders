@@ -189,18 +189,19 @@ u32 Win32GetMillisecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End, s64 Perf
   return (u32)(1000.0f * ((End.QuadPart - Start.QuadPart) / (f32)PerfCountFrequency));
 }
 
+
 bool Win32ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Size)
 {
 
   DWORD  dwBytesRead = 0;
 
-  HANDLE hFile       = CreateFile(Filename,                                     //
-                                  GENERIC_READ,                                 //
-                                  FILE_SHARE_READ,                              //
-                                  NULL,                                         //
-                                  OPEN_EXISTING,                                //
+  HANDLE hFile       = CreateFile(Filename,              //
+                                  GENERIC_READ,          //
+                                  FILE_SHARE_READ,       //
+                                  NULL,                  //
+                                  OPEN_EXISTING,         //
                                   FILE_ATTRIBUTE_NORMAL, //
-                                  NULL                                          //
+                                  NULL                   //
         );
 
   if (hFile == INVALID_HANDLE_VALUE)
@@ -211,18 +212,21 @@ bool Win32ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Siz
   u32        FileSize          = GetFileSize(hFile, NULL);
   u8*        Buffer            = (u8*)Arena_Allocate(Arena, FileSize + 1);
 
-  
-  DWORD    NumberOfBytesRead = 0;
+  DWORD      NumberOfBytesRead = 0;
   OVERLAPPED ol                = {};
 
-  s32 Result            = ReadFile(hFile, Buffer, FileSize, &NumberOfBytesRead, &ol);
-  DWORD Error = GetLastError();
+  s32        Result            = ReadFile(hFile, Buffer, FileSize, &NumberOfBytesRead, &ol);
+  DWORD      Error             = GetLastError();
   if (Result == false || FileSize != NumberOfBytesRead)
   {
     Arena_Deallocate(Arena, FileSize + 1);
     return false;
   }
   Buffer[FileSize] = '\0';
+  *FileBuffer      = Buffer;
+  *Size            = FileSize;
+
+  CloseHandle(hFile);
 
   return true;
 }
@@ -297,6 +301,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   LARGE_INTEGER PreviousTimer     = Win32GetTimeInMilliseconds();
   u32           TargetFrameTimeMS = 33;
+
+  vec2i Min = V2i((GlobalScreenWidth - Image.Width)  / 2, (GlobalScreenHeight - Image.Height)  / 2);
+  vec2i Max = V2i((GlobalScreenWidth + Image.Width)  / 2, (GlobalScreenHeight + Image.Height)  / 2);
   while (!GlobalShouldQuit)
   {
     if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath))
@@ -309,6 +316,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     Pushbuffer_Reset(&Pushbuffer);
 
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
+    Pushbuffer_Push_Rect_Texture(&Pushbuffer, (void*)Image.Buffer, Min, Max);
 
     Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);
     Win32_RenderFramebuffer(hwnd);

@@ -54,6 +54,17 @@ void Pushbuffer_Push_Rect_Color(pushbuffer* Pushbuffer, vec2i Min, vec2i Max, u3
   Pushbuffer_Write(Pushbuffer, Pushbuffer_Entry_Rect_Color, pushbuffer_entry_type);
   Pushbuffer_Write(Pushbuffer, Entry, pushbuffer_entry_rect_color);
 }
+void Pushbuffer_Push_Rect_Texture(pushbuffer* Pushbuffer, void *Memory, vec2i Min, vec2i Max)
+{
+
+  Pushbuffer_CheckSpace(Pushbuffer, sizeof(pushbuffer_entry_rect_texture));
+  pushbuffer_entry_rect_texture Entry = {};
+  Entry.Memory = Memory;
+  Entry.Min = Min;
+  Entry.Max = Max;
+  Pushbuffer_Write(Pushbuffer, Pushbuffer_Entry_Rect_Texture, pushbuffer_entry_type);
+  Pushbuffer_Write(Pushbuffer, Entry, pushbuffer_entry_rect_texture);
+}
 
 void Pushbuffer_PushClear(pushbuffer* Pushbuffer, u32 Color)
 {

@@ -34,10 +34,9 @@ typedef struct pushbuffer_entry_rect_color
 
 typedef struct pushbuffer_entry_rect_texture
 {
-  // It's implied that the width / height are min/max values
+  void * Memory;
   vec2i Min;
   vec2i Max;
-  void * Memory;
 } pushbuffer_entry_rect_texture;
 
 #endif

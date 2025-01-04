@@ -3,13 +3,6 @@
 
 #include "common.h"
 
-typedef enum image_format
-{
-  ImageFormat_RGBA,
-  ImageFormat_ARGB,
-  ImageFormat_Greyscale
-} image_format;
-
 typedef struct targa_header
 {
   u8 CharactersInIdentificationField;
@@ -22,7 +15,6 @@ typedef struct targa_header
 typedef struct targa_image
 {
   u32*         Buffer;
-  image_format Format;
   u32          Width;
   u32          Height;
 } targa_image;

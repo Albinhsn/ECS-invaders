@@ -56,6 +56,39 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
 
       break;
     }
+    case Pushbuffer_Entry_Rect_Texture:
+    {
+      s32                           Width       = Renderer->Width;
+      s32                           Height      = Renderer->Height;
+      pushbuffer_entry_rect_texture Entry       = Pushbuffer_Read(Pushbuffer, pushbuffer_entry_rect_texture);
+
+      u32                           MinX        = Entry.Min.X < 0 ? 0 : Entry.Min.X;
+      u32                           MinY        = Entry.Min.Y < 0 ? 0 : Entry.Min.Y;
+
+      u32                           MaxX        = Entry.Max.X > Width ? Width : Entry.Max.X;
+      u32                           MaxY        = Entry.Max.Y > Height ? Height : Entry.Max.Y;
+
+      u32*                          Buffer      = Renderer->Buffer;
+      u32*                          ImageBuffer = (u32*)Entry.Memory;
+
+      u32                           ImageWidth  = Entry.Max.X - Entry.Min.X;
+
+      for (u32 Y = MinY; Y < MaxY; Y++)
+      {
+        for (u32 X = MinX; X < MaxX; X++)
+        {
+          u32 Color                 = *(ImageBuffer + (Y - MinY) * ImageWidth + (X - MinX));
+          *(Buffer + Y * Width + X) = Color;
+
+          if (Color != 0)
+          {
+            int a = 5;
+          }
+        }
+      }
+
+      break;
+    }
     default:
     {
       Assert(0 && "Unknown pushbuffer entry!");

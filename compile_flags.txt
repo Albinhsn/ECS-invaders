@@ -1,0 +1,4 @@
+-Wno-null-dereference
+-Wno-logical-not-parentheses
+-Wno-tautological-constant-out-of-range-compare
+-Wno-writable-strings
