@@ -17,6 +17,11 @@ typedef int64_t  s64;
 typedef float    f32;
 typedef double   f64;
 
+#define true 1
+#define false 0
+
+#define bool u8
+
 #define Kilobyte(size) (size * 1024LL)
 #define Megabyte(size) (Kilobyte(size) * 1024LL)
 #define Gigabyte(size) (Megabyte(size) * 1024LL)
@@ -38,6 +43,20 @@ void Arena_Create(arena* Arena, void* Memory, u64 Size)
   Arena->Memory = Memory;
   Arena->Size   = Size;
   Arena->Offset = 0;
+}
+void Arena_Deallocate(arena* Arena, u64 Size)
+{
+
+  Arena->Offset -= Size;
+
+  if (Arena->Offset >= Size)
+  {
+    Assert(0 && "Trying to deallocate past the offset?");
+  }
+  char Buffer[1024] = {};
+  sprintf_s(Buffer, ArrayCount(Buffer),"Deallocated, Allocated %lld out of %lld (%.2f)\n", Arena->Offset, Arena->Size, Arena->Offset / (f32)Arena->Size);
+  OutputDebugStringA(Buffer);
+
 }
 
 void* Arena_Allocate(arena* Arena, u64 Size)

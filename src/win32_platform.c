@@ -1,6 +1,7 @@
 #include "common.h"
 #include <windows.h>
 
+#include "image.c"
 #include "renderer_software.c"
 #include "win32_platform.h"
 
@@ -174,7 +175,7 @@ void Win32_ProcessMessages(game_input* Input)
   }
 }
 
-LARGE_INTEGER GetTimeInMilliseconds()
+LARGE_INTEGER Win32GetTimeInMilliseconds()
 {
   LARGE_INTEGER CurrentTime;
   QueryPerformanceCounter(&CurrentTime);
@@ -182,10 +183,48 @@ LARGE_INTEGER GetTimeInMilliseconds()
   return CurrentTime;
 }
 
-u32 GetMillisecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End, s64 PerfCountFrequency)
+u32 Win32GetMillisecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End, s64 PerfCountFrequency)
 {
 
   return (u32)(1000.0f * ((End.QuadPart - Start.QuadPart) / (f32)PerfCountFrequency));
+}
+
+bool Win32ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Size)
+{
+
+  DWORD  dwBytesRead = 0;
+
+  HANDLE hFile       = CreateFile(Filename,                                     //
+                                  GENERIC_READ,                                 //
+                                  FILE_SHARE_READ,                              //
+                                  NULL,                                         //
+                                  OPEN_EXISTING,                                //
+                                  FILE_ATTRIBUTE_NORMAL, //
+                                  NULL                                          //
+        );
+
+  if (hFile == INVALID_HANDLE_VALUE)
+  {
+    return false;
+  }
+
+  u32        FileSize          = GetFileSize(hFile, NULL);
+  u8*        Buffer            = (u8*)Arena_Allocate(Arena, FileSize + 1);
+
+  
+  DWORD    NumberOfBytesRead = 0;
+  OVERLAPPED ol                = {};
+
+  s32 Result            = ReadFile(hFile, Buffer, FileSize, &NumberOfBytesRead, &ol);
+  DWORD Error = GetLastError();
+  if (Result == false || FileSize != NumberOfBytesRead)
+  {
+    Arena_Deallocate(Arena, FileSize + 1);
+    return false;
+  }
+  Buffer[FileSize] = '\0';
+
+  return true;
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
@@ -225,6 +264,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   arena GameArena      = {};
   Arena_Create(&GameArena, Memory, GameMemorySize);
 
+  const char* Filename   = "../assets/filledHeart.tga";
+  u8*         FileBuffer = {};
+  u32         Size;
+  Win32ReadFile(&GameArena, Filename, &FileBuffer, &Size);
+  targa_image Image = {};
+  Image_LoadTarga(&GameArena, &Image, FileBuffer, Size);
+
   Win32_Create_Renderer(&GlobalRenderer, &GameArena);
 
   LARGE_INTEGER PerfCountFrequencyResult;
@@ -249,7 +295,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   game_input    GameInput         = {};
 
-  LARGE_INTEGER PreviousTimer     = GetTimeInMilliseconds();
+  LARGE_INTEGER PreviousTimer     = Win32GetTimeInMilliseconds();
   u32           TargetFrameTimeMS = 33;
   while (!GlobalShouldQuit)
   {
@@ -267,8 +313,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);
     Win32_RenderFramebuffer(hwnd);
 
-    LARGE_INTEGER CurrentTimer = GetTimeInMilliseconds();
-    u32           FrameTimeMS  = GetMillisecondsElapsed(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
+    LARGE_INTEGER CurrentTimer = Win32GetTimeInMilliseconds();
+    u32           FrameTimeMS  = Win32GetMillisecondsElapsed(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
     if (FrameTimeMS < TargetFrameTimeMS)
     {
       u32 TimeToSleep = TargetFrameTimeMS - FrameTimeMS;

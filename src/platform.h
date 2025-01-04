@@ -27,4 +27,7 @@ typedef struct game_input
 #define GAME_UPDATE(name) void name(game_memory* Memory, game_input* Input, pushbuffer* Pushbuffer)
 typedef GAME_UPDATE(game_update);
 
+#define READ_FILE(name) void name(const char* Filename, void** Buffer, u32* Size)
+typedef READ_FILE(read_file);
+
 #endif
