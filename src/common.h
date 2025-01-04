@@ -116,7 +116,7 @@ u64 AlignOffset(u64 offset, u64 alignment)
 }
 
 #define DEFAULT_ALIGNMENT 16
-void Pool_Init(pool_allocator* Pool, void* Memory, u64 ChunkSize)
+void Pool_Create(pool_allocator* Pool, void* Memory, u64 ChunkSize)
 {
   Pool->Memory     = Memory;
   Pool->ChunkSize= AlignOffset(ChunkSize, DEFAULT_ALIGNMENT);

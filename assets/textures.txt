@@ -1,0 +1,9 @@
+../assets/filledHeart.tga filledHeart
+../assets/unfilledHeart.tga unfilledHeart
+../assets/spaceParts_005.tga spaceParts5
+../assets/spaceParts_038.tga spaceParts38
+../assets/spaceParts_057.tga spaceParts57
+../assets/spaceShips_001.tga spaceShips1
+../assets/spaceShips_002.tga spaceShips2
+../assets/spaceEffects_008.tga spaceEffects8
+../assets/spaceMissiles_002.tga spaceMissiles2

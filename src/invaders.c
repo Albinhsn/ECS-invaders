@@ -2,14 +2,22 @@
 #include "platform.h"
 #include "pushbuffer.c"
 
+void LoadTextures()
+{
+}
+
 GAME_UPDATE(GameUpdate)
 {
   Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
-  game_state* GameState = (game_state*)Memory->TransientStorage;
-  if (!GameState->Initialized)
+  game_state* GameState = (game_state*)Memory->PermanentStorage;
+  if (!Memory->IsInitialized)
   {
+    // Initialize GameArena
+
+    // Read and initalize textures
+    // Store a file with "path name"
     GameState->PlayerPosition = V2f(100, 100);
-    GameState->Initialized = 1;
+    Memory->IsInitialized = True;
   }
 
   f32 Velocity = 10.0f;

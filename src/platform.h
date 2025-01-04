@@ -6,11 +6,12 @@
 
 typedef struct game_memory
 {
+  u8    IsInitialized;
   void* TransientStorage;
   u64   TransientStorageSize;
 
-  void* TemporaryStorage;
-  u64   TemporarySize;
+  void* PermanentStorage;
+  u64   PermanentSize;
 
 } game_memory;
 
