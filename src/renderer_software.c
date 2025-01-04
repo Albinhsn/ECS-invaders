@@ -69,7 +69,7 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
       u32                           MaxY        = Entry.Max.Y > Height ? Height : Entry.Max.Y;
 
       u32*                          Buffer      = Renderer->Buffer;
-      u32*                          ImageBuffer = (u32*)Entry.Memory;
+      u32*                          ImageBuffer = Entry.Memory;
 
       u32                           ImageWidth  = Entry.Max.X - Entry.Min.X;
 
@@ -77,12 +77,12 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
       {
         for (u32 X = MinX; X < MaxX; X++)
         {
-          u32 Color                 = *(ImageBuffer + (Y - MinY) * ImageWidth + (X - MinX));
-          *(Buffer + Y * Width + X) = Color;
-
-          if (Color != 0)
+          u32 ImageOffset = (Y - MinY) * ImageWidth + (X - MinX);
+          u32 Color       = *(ImageBuffer + ImageOffset);
+          u32 DestAlpha   = Color >> 24;
+          if (DestAlpha != 0)
           {
-            int a = 5;
+            *(Buffer + Y * Width + X) = Color;
           }
         }
       }

@@ -34,7 +34,7 @@ typedef struct pushbuffer_entry_rect_color
 
 typedef struct pushbuffer_entry_rect_texture
 {
-  void * Memory;
+  u32* Memory;
   vec2i Min;
   vec2i Max;
 } pushbuffer_entry_rect_texture;

@@ -275,6 +275,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   targa_image Image = {};
   Image_LoadTarga(&GameArena, &Image, FileBuffer, Size);
 
+  Targa_SavePPM(&Image);
+
+
   Win32_Create_Renderer(&GlobalRenderer, &GameArena);
 
   LARGE_INTEGER PerfCountFrequencyResult;
@@ -313,12 +316,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
 
     Win32_ProcessMessages(&GameInput);
-    Pushbuffer_Reset(&Pushbuffer);
 
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
-    Pushbuffer_Push_Rect_Texture(&Pushbuffer, (void*)Image.Buffer, Min, Max);
+    Pushbuffer_Push_Rect_Texture(&Pushbuffer, Image.Buffer, Min, Max);
 
     Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);
+    Pushbuffer_Reset(&Pushbuffer);
     Win32_RenderFramebuffer(hwnd);
 
     LARGE_INTEGER CurrentTimer = Win32GetTimeInMilliseconds();
