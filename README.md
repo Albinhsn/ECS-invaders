@@ -7,21 +7,26 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading
 * Multithreading
 * Scaling textures
 * Basic UI
+* 2 Different renderers
 
 
 # Things i'd like to solve in the next project
 * More advanced rendering
 * Asset Loader
+* Linux abstraction?
 
 
 # ToDo
-* Debug print frame time
 * Get the player moving again
 * Shoot bullets
 * EnemyManager
     * I.e just a heap that constantly pushes SpawnEnemyCommands etc
-* Do a 8 bit flag for
-    * Team (i.e enemy or not)
+* TeamComponent?
+
+* CommandBuffer
+    * SpawnEnemy
+    * DecideWhenToSpawnEnemies
+    * EnemyShoot
 
 * UI 
     * Button

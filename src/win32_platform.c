@@ -175,12 +175,17 @@ void Win32_ProcessMessages(game_input* Input)
   }
 }
 
-LARGE_INTEGER Win32_GetTimeInMilliseconds()
+LARGE_INTEGER Win32_GetTimeInSeconds()
 {
   LARGE_INTEGER CurrentTime;
   QueryPerformanceCounter(&CurrentTime);
 
   return CurrentTime;
+}
+f32 Win32_GetMillisecondsElapsedF(LARGE_INTEGER Start, LARGE_INTEGER End, s64 PerfCountFrequency)
+{
+
+  return 1000.0f * ((End.QuadPart - Start.QuadPart) / (f32)PerfCountFrequency);
 }
 
 u32 Win32_GetMillisecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End, s64 PerfCountFrequency)
@@ -300,7 +305,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   game_input    GameInput         = {};
 
-  LARGE_INTEGER PreviousTimer     = Win32_GetTimeInMilliseconds();
+  LARGE_INTEGER PreviousTimer     = Win32_GetTimeInSeconds();
   u32           TargetFrameTimeMS = 33;
 
   GameMemory.ReadFile             = Win32_ReadFile;
@@ -320,13 +325,22 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     Pushbuffer_Reset(&Pushbuffer);
     Win32_RenderFramebuffer(hwnd);
 
-    LARGE_INTEGER CurrentTimer = Win32_GetTimeInMilliseconds();
+    LARGE_INTEGER CurrentTimer = Win32_GetTimeInSeconds();
     u32           FrameTimeMS  = Win32_GetMillisecondsElapsed(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
+    f32           FrameTimeMSF  = Win32_GetMillisecondsElapsedF(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
+
+    char FrameTimeBuf[1024] = {};
+    sprintf_s(FrameTimeBuf, ArrayCount(FrameTimeBuf), "Frame: %.4f\n", FrameTimeMSF);
+    OutputDebugStringA(FrameTimeBuf);
+
+
     if (FrameTimeMS < TargetFrameTimeMS)
     {
       u32 TimeToSleep = TargetFrameTimeMS - FrameTimeMS;
-      Sleep(FrameTimeMS);
+      Sleep(TimeToSleep);
     }
+    CurrentTimer = Win32_GetTimeInSeconds();
+    PreviousTimer = CurrentTimer;
   }
 
   return 0;
