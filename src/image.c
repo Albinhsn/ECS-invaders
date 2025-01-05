@@ -94,9 +94,6 @@ void Targa_ParseUnmappedRGBImage(arena* Arena, targa_image* Image, u8* Buffer, u
       
       Image->Buffer[Index] = Entry;
       Offset += 4;
-      char Buf[1024] = {};
-      sprintf_s(Buf, ArrayCount(Buf),"%d %d %d %d, %d -> %d\n", red, green, blue ,attribute, Index, Image->Buffer[Index]);
-      OutputDebugStringA(Buf);
       break;
     }
     case 24:

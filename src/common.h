@@ -31,6 +31,12 @@ typedef double   f64;
   if (!Expr)                                                                                                                                                                                           \
     int a = *(int*)0;
 
+typedef struct string
+{
+  u8 * Buffer;
+  u32 Length;
+}string;
+
 typedef struct arena
 {
   void* Memory;
@@ -38,13 +44,14 @@ typedef struct arena
   u64   Offset;
 } arena;
 
+
 typedef struct texture texture;
 struct texture
 {
   void*    Memory;
   u32      Width;
   u32      Height;
-  texture* Next;
+  string   Name;
 };
 
 typedef struct pool_free_node pool_free_node;
@@ -73,6 +80,38 @@ void* Pool_Alloc(pool_allocator* Pool)
 
   return memset(Node, 0, Pool->ChunkSize);
 }
+
+
+
+bool IsAlphaOrDigit(u8 Char){
+  bool IsAlpha = (Char >= 'a' && Char <= 'z') || (Char >= 'A' && Char <= 'Z');
+  bool IsDigit = (Char >= '0' && Char <= '9');
+  return IsAlpha | IsDigit;
+}
+
+u32 String_Length(u8 * Buffer){
+  u32 Length = 0;
+  while(Buffer[Length] != '\0'){
+    Length++;
+  }
+  return Length;
+}
+
+bool String_Compare(string * s0, string * s1)
+{
+  if(s0->Length != s1->Length){
+    return false;
+  }
+  for(u32 CharIndex = 0; CharIndex < s0->Length; CharIndex++){
+    if(s0->Buffer[CharIndex] != s1->Buffer[CharIndex]){
+      return false;
+    }
+  }
+  return true;
+
+}
+
+
 void Pool_Free(pool_allocator* Pool, u64 Ptr)
 {
   if (Ptr == 0)

@@ -14,9 +14,11 @@ struct texture_node
 
 typedef struct game_state
 {
-  arena          GameArena;
-  pool_allocator TexturePool;
-  vec2f          PlayerPosition;
+  arena    PermanentArena;
+  arena    TemporaryArena;
+  texture* Textures;
+  u32      TextureCount;
+  vec2f    PlayerPosition;
 } game_state;
 
 #endif

@@ -89,7 +89,7 @@ void Win32_RenderFramebuffer(HWND hwnd)
   ReleaseDC(hwnd, hdc);
 }
 
-static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+static LRESULT CALLBACK Win32_WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
   switch (uMsg)
   {
@@ -175,7 +175,7 @@ void Win32_ProcessMessages(game_input* Input)
   }
 }
 
-LARGE_INTEGER Win32GetTimeInMilliseconds()
+LARGE_INTEGER Win32_GetTimeInMilliseconds()
 {
   LARGE_INTEGER CurrentTime;
   QueryPerformanceCounter(&CurrentTime);
@@ -183,14 +183,13 @@ LARGE_INTEGER Win32GetTimeInMilliseconds()
   return CurrentTime;
 }
 
-u32 Win32GetMillisecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End, s64 PerfCountFrequency)
+u32 Win32_GetMillisecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End, s64 PerfCountFrequency)
 {
 
   return (u32)(1000.0f * ((End.QuadPart - Start.QuadPart) / (f32)PerfCountFrequency));
 }
 
-
-bool Win32ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Size)
+bool Win32_ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Size)
 {
 
   DWORD  dwBytesRead = 0;
@@ -238,7 +237,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   WNDCLASS    wc              = {};
 
-  wc.lpfnWndProc              = WindowProc;
+  wc.lpfnWndProc              = Win32_WindowProc;
   wc.hInstance                = hInstance;
   wc.lpszClassName            = WindowClassName;
 
@@ -271,12 +270,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   const char* Filename   = "../assets/spaceShips_001.tga";
   u8*         FileBuffer = {};
   u32         Size;
-  Win32ReadFile(&GameArena, Filename, &FileBuffer, &Size);
+  Win32_ReadFile(&GameArena, Filename, &FileBuffer, &Size);
   targa_image Image = {};
   Image_LoadTarga(&GameArena, &Image, FileBuffer, Size);
 
   Targa_SavePPM(&Image);
-
 
   Win32_Create_Renderer(&GlobalRenderer, &GameArena);
 
@@ -295,18 +293,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   Pushbuffer_Create(&Pushbuffer, PushbufferMemory, PushbufferMemorySize);
 
   game_memory GameMemory          = {};
-  GameMemory.TemporarySize        = Megabyte(100);
-  GameMemory.TemporaryStorage     = Arena_Allocate(&GameArena, GameMemory.TemporarySize);
-  GameMemory.TransientStorageSize = Megabyte(100);
-  GameMemory.TransientStorage     = Arena_Allocate(&GameArena, GameMemory.TransientStorageSize);
+  GameMemory.PermanentSize        = Megabyte(100);
+  GameMemory.PermanentStorage     = Arena_Allocate(&GameArena, GameMemory.PermanentSize);
+  GameMemory.TemporaryStorageSize = Megabyte(100);
+  GameMemory.TemporaryStorage     = Arena_Allocate(&GameArena, GameMemory.TemporaryStorageSize);
 
   game_input    GameInput         = {};
 
-  LARGE_INTEGER PreviousTimer     = Win32GetTimeInMilliseconds();
+  LARGE_INTEGER PreviousTimer     = Win32_GetTimeInMilliseconds();
   u32           TargetFrameTimeMS = 33;
 
-  vec2i Min = V2i((GlobalScreenWidth - Image.Width)  / 2, (GlobalScreenHeight - Image.Height)  / 2);
-  vec2i Max = V2i((GlobalScreenWidth + Image.Width)  / 2, (GlobalScreenHeight + Image.Height)  / 2);
+  vec2i         Min               = V2i((GlobalScreenWidth - Image.Width) / 2, (GlobalScreenHeight - Image.Height) / 2);
+  vec2i         Max               = V2i((GlobalScreenWidth + Image.Width) / 2, (GlobalScreenHeight + Image.Height) / 2);
+  GameMemory.ReadFile             = Win32_ReadFile;
   while (!GlobalShouldQuit)
   {
     if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath))
@@ -324,8 +323,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     Pushbuffer_Reset(&Pushbuffer);
     Win32_RenderFramebuffer(hwnd);
 
-    LARGE_INTEGER CurrentTimer = Win32GetTimeInMilliseconds();
-    u32           FrameTimeMS  = Win32GetMillisecondsElapsed(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
+    LARGE_INTEGER CurrentTimer = Win32_GetTimeInMilliseconds();
+    u32           FrameTimeMS  = Win32_GetMillisecondsElapsed(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
     if (FrameTimeMS < TargetFrameTimeMS)
     {
       u32 TimeToSleep = TargetFrameTimeMS - FrameTimeMS;

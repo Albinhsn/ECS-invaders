@@ -7,12 +7,12 @@
 typedef struct game_memory
 {
   u8    IsInitialized;
-  void* TransientStorage;
-  u64   TransientStorageSize;
+  void* TemporaryStorage;
+  u64   TemporaryStorageSize;
 
   void* PermanentStorage;
   u64   PermanentSize;
-
+  bool (*ReadFile)(arena* Arena, const char* Filename, u8** Buffer, u32* Size);
 } game_memory;
 
 typedef struct game_input
@@ -27,8 +27,5 @@ typedef struct game_input
 
 #define GAME_UPDATE(name) void name(game_memory* Memory, game_input* Input, pushbuffer* Pushbuffer)
 typedef GAME_UPDATE(game_update);
-
-#define READ_FILE(name) void name(const char* Filename, void** Buffer, u32* Size)
-typedef READ_FILE(read_file);
 
 #endif

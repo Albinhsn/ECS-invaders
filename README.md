@@ -1,13 +1,22 @@
 # Invaders
 Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading
 
+# Things i'd like to solve in this project
+* ECS
+* Basic Audio
+* Multithreading
+* Scaling textures
+* Basic UI
+
+
+# Things i'd like to solve in the next project
+* More advanced rendering
+* Asset loader
+
 
 # ToDo
 
 * Asset loading
-    * Just store uncompressed assets from a pool inside the renderer
-    * Load at the start and refer to them at by idx
-    * You call this when you initialize the game memory, let the game decide which textures to use
 
 * ECS
     * Create Entity
