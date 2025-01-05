@@ -4,32 +4,67 @@
 #include "common.h"
 #include "vector.h"
 
-typedef struct HealthComponent
+#define HEALTH_ID 0
+#define POSITION_ID 1
+#define VELOCITY_ID 2
+#define RENDER_ID 3
+#define COLLIDER_ID  4
+
+#define HEALTH_MASK (1 << HEALTH_ID)
+#define POSITION_MASK (1 << POSITION_ID)
+#define VELOCITY_MASK (1 << VELOCITY_ID)
+#define RENDER_MASK (1 << RENDER_ID)
+#define COLLIDER_MASK (1 << COLLIDER_ID)
+
+typedef struct health_component
 {
   s32 Health;
   u8  DamageTaken;
-} HealthComponent;
+} health_component;
 
-typedef struct PositionComponent
+typedef struct position_component
 {
   vec2f Position;
   float Rotation;
-} PositionComponent;
+} position_component;
 
-typedef struct VelocityComponent
+typedef struct velocity_component
 {
   vec2f Velocity;
-} VelocityComponent;
+} velocity_component;
 
-typedef struct RenderComponent
+typedef struct render_component
 {
   texture* Texture;
   float    Alpha;
-} RenderComponent;
+} render_component;
 
-typedef struct ColliderComponent
+typedef struct collider_component
 {
   vec2f Extents;
-} ColliderComponent;
+} collider_component;
+
+typedef struct query_result
+{
+  u32  Count;
+  u32* Ids;
+} query_result;
+
+typedef u32 entity;
+
+typedef struct entity_manager
+{
+  u32*  Masks;
+  u32*  ComponentSize;
+  u32* ComponentOffset;
+  u32* EntityFreeList;
+  void* Data;
+  u32   EntitySize;
+  u32   EntityCount;
+  u32   MaxEntityCount;
+
+  query_result Result;
+
+} entity_manager;
 
 #endif

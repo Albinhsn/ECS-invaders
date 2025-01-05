@@ -2,6 +2,7 @@
 #define INVADERS_H
 
 #include "common.h"
+#include "entity.h"
 #include "vector.h"
 
 typedef struct texture_node texture_node;
@@ -16,6 +17,8 @@ typedef struct game_state
 {
   arena    PermanentArena;
   arena    TemporaryArena;
+
+  entity_manager EntityManager;
   texture* Textures;
   u32      TextureCount;
   vec2f    PlayerPosition;

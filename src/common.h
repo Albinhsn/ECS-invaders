@@ -20,7 +20,7 @@ typedef double   f64;
 #define true              1
 #define false             0
 
-#define bool              u8
+#define bool              u32
 
 #define Kilobyte(size)    (size * 1024LL)
 #define Megabyte(size)    (Kilobyte(size) * 1024LL)
@@ -66,6 +66,15 @@ typedef struct pool_allocator
   u64 ChunkSize;
   pool_free_node * Head;
 } pool_allocator;
+
+void Memcpy(u8 * Dest, u8 * Src, u32 Count)
+{
+
+  for(u32 BufferIndex = 0; BufferIndex < Count; BufferIndex++){
+    Dest[BufferIndex] = Src[BufferIndex];
+  }
+
+}
 
 void* Pool_Alloc(pool_allocator* Pool)
 {

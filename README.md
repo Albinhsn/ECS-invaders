@@ -11,16 +11,17 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading
 
 # Things i'd like to solve in the next project
 * More advanced rendering
-* Asset loader
+* Asset Loader
 
 
 # ToDo
-
-* Asset loading
-
-* ECS
-    * Create Entity
-    * Query Components
+* Debug print frame time
+* Get the player moving again
+* Shoot bullets
+* EnemyManager
+    * I.e just a heap that constantly pushes SpawnEnemyCommands etc
+* Do a 8 bit flag for
+    * Team (i.e enemy or not)
 
 * UI 
     * Button

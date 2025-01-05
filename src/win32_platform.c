@@ -303,8 +303,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   LARGE_INTEGER PreviousTimer     = Win32_GetTimeInMilliseconds();
   u32           TargetFrameTimeMS = 33;
 
-  vec2i         Min               = V2i((GlobalScreenWidth - Image.Width) / 2, (GlobalScreenHeight - Image.Height) / 2);
-  vec2i         Max               = V2i((GlobalScreenWidth + Image.Width) / 2, (GlobalScreenHeight + Image.Height) / 2);
   GameMemory.ReadFile             = Win32_ReadFile;
   while (!GlobalShouldQuit)
   {
@@ -317,7 +315,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     Win32_ProcessMessages(&GameInput);
 
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
-    Pushbuffer_Push_Rect_Texture(&Pushbuffer, Image.Buffer, Min, Max);
 
     Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);
     Pushbuffer_Reset(&Pushbuffer);

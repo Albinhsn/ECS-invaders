@@ -1,6 +1,7 @@
 #include "invaders.h"
 #include "image.c"
 #include "platform.h"
+#include "entity.c"
 #include "pushbuffer.c"
 #include <debugapi.h>
 
@@ -89,6 +90,43 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
   }
 }
 
+void Render(game_state * GameState, pushbuffer * Pushbuffer)
+{
+  query_result Query = EntityManager_Query(&GameState->EntityManager, POSITION_MASK | RENDER_MASK);
+  for(u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++){
+    entity Entity = Query.Ids[QueryIndex];
+
+    position_component * Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
+    render_component * Render     = (render_component*) EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, RENDER_ID);
+
+    vec2i Min = V2i((s32)(Position->Position.X - Render->Texture->Width * 0.5f),(s32)(Position->Position.Y - Render->Texture->Height * 0.5f));
+    vec2i Max = V2i((s32)(Position->Position.X + Render->Texture->Width * 0.5f),(s32)(Position->Position.Y + Render->Texture->Height * 0.5f));
+    Pushbuffer_Push_Rect_Texture(Pushbuffer, Render->Texture->Memory, Min, Max);
+
+  }
+
+}
+
+void CreatePlayer(game_state * GameState){
+
+  u32 Mask = POSITION_MASK | HEALTH_MASK | RENDER_MASK | COLLIDER_MASK | VELOCITY_MASK;
+  entity Entity = EntityManager_Create_Entity(&GameState->EntityManager, Mask);
+
+  health_component Health = {};
+  Health.Health = 3;
+  position_component Position = {};
+  Position.Position = V2f(200, 550);
+  velocity_component Velocity= {};
+  render_component Render= {};
+  const char * PlayerTextureName = "spaceShips1";
+  Render.Texture = GetTextureByName(GameState, (u8*)PlayerTextureName);
+  Render.Alpha = 1;
+  collider_component Collider= {};
+  Collider.Extents = V2f(Render.Texture->Width * 0.5f, Render.Texture->Height  * 0.5f);
+  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 5, &Health, &Position, &Velocity, &Render, &Collider);
+
+}
+
 GAME_UPDATE(GameUpdate)
 {
   Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
@@ -105,32 +143,20 @@ GAME_UPDATE(GameUpdate)
 
     LoadTextures(GameState, Memory);
 
-    GameState->PlayerPosition = V2f(100, 100);
+
+    EntityManager_Create(&GameState->PermanentArena, &GameState->EntityManager, 256, 5, sizeof(health_component), sizeof(position_component), sizeof(velocity_component), sizeof(render_component), sizeof(collider_component));
+    CreatePlayer(GameState);
     Memory->IsInitialized     = true;
   }
+  // Omega slow :)
   // Arena_Clear(&GameState->TemporaryArena);
 
-  f32 Velocity = 10.0f;
-  if (Input->Up)
-  {
-    GameState->PlayerPosition.Y -= Velocity / 60.0f;
-  }
-  if (Input->Down)
-  {
-    GameState->PlayerPosition.Y += Velocity / 60.0f;
-  }
-  if (Input->Left)
-  {
-    GameState->PlayerPosition.X -= Velocity / 60.0f;
-  }
-  if (Input->Right)
-  {
-    GameState->PlayerPosition.X += Velocity / 60.0f;
-  }
 
-  const char * PlayerTextureName = "spaceShips1";
-  texture * PlayerTexture = GetTextureByName(GameState, (u8*)PlayerTextureName);
-  vec2i Min = V2i((u32)(GameState->PlayerPosition.X - PlayerTexture->Width  / 2), (u32)(GameState->PlayerPosition.Y - PlayerTexture->Height / 2));
-  vec2i Max = V2i((u32)(GameState->PlayerPosition.X + PlayerTexture->Width  / 2), (u32)(GameState->PlayerPosition.Y + PlayerTexture->Height / 2));
-  Pushbuffer_Push_Rect_Texture(Pushbuffer, PlayerTexture->Memory, Min, Max);
+  // Use input
+  //  i.e set velocity and figure out if we shoot
+  // Update physics
+  // Collision detection and collision response
+
+  Render(GameState, Pushbuffer);
+
 }
