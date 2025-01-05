@@ -37,6 +37,7 @@ typedef struct pushbuffer_entry_rect_texture
   u32* Memory;
   vec2i Min;
   vec2i Max;
+  bool FlippedZ;
 } pushbuffer_entry_rect_texture;
 
 #endif

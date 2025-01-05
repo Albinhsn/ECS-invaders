@@ -19,8 +19,10 @@ typedef struct game_state
   arena    TemporaryArena;
 
   entity_manager EntityManager;
+  entity PlayerEntity;
   texture* Textures;
   u32      TextureCount;
+  f32 DeltaTime;
   vec2f    PlayerPosition;
 } game_state;
 

@@ -24,19 +24,22 @@ typedef struct health_component
 
 typedef struct position_component
 {
-  vec2f Position;
+  f32 X;
+  f32 Y;
   float Rotation;
 } position_component;
 
 typedef struct velocity_component
 {
-  vec2f Velocity;
+  f32 X;
+  f32 Y;
 } velocity_component;
 
 typedef struct render_component
 {
   texture* Texture;
   float    Alpha;
+  bool FlippedZ;
 } render_component;
 
 typedef struct collider_component

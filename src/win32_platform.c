@@ -309,6 +309,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   u32           TargetFrameTimeMS = 33;
 
   GameMemory.ReadFile             = Win32_ReadFile;
+  f32 DeltaTime = TargetFrameTimeMS / 1000.0f;
   while (!GlobalShouldQuit)
   {
     if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath))
@@ -319,6 +320,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     Win32_ProcessMessages(&GameInput);
 
+    GameMemory.DeltaTime = DeltaTime;
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
 
     Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);
@@ -337,8 +339,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     if (FrameTimeMS < TargetFrameTimeMS)
     {
       u32 TimeToSleep = TargetFrameTimeMS - FrameTimeMS;
+      DeltaTime = (TargetFrameTimeMS / 1000.0f) - FrameTimeMSF;
       Sleep(TimeToSleep);
+    }else{
+      DeltaTime = FrameTimeMSF;
     }
+
     CurrentTimer = Win32_GetTimeInSeconds();
     PreviousTimer = CurrentTimer;
   }

@@ -17,7 +17,6 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading
 
 
 # ToDo
-* Get the player moving again
 * Shoot bullets
 * EnemyManager
     * I.e just a heap that constantly pushes SpawnEnemyCommands etc
@@ -31,6 +30,7 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading
 * UI 
     * Button
     * Text 
+* Particle System
 
 * Audio
     * Shoot Bullet

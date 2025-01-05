@@ -1,5 +1,6 @@
 #include "invaders.h"
 #include "image.c"
+#include "vector.c"
 #include "platform.h"
 #include "entity.c"
 #include "pushbuffer.c"
@@ -99,9 +100,9 @@ void Render(game_state * GameState, pushbuffer * Pushbuffer)
     position_component * Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
     render_component * Render     = (render_component*) EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, RENDER_ID);
 
-    vec2i Min = V2i((s32)(Position->Position.X - Render->Texture->Width * 0.5f),(s32)(Position->Position.Y - Render->Texture->Height * 0.5f));
-    vec2i Max = V2i((s32)(Position->Position.X + Render->Texture->Width * 0.5f),(s32)(Position->Position.Y + Render->Texture->Height * 0.5f));
-    Pushbuffer_Push_Rect_Texture(Pushbuffer, Render->Texture->Memory, Min, Max);
+    vec2i Min = V2i((s32)(Position->X - Render->Texture->Width * 0.5f),(s32)(Position->Y - Render->Texture->Height * 0.5f));
+    vec2i Max = V2i((s32)(Position->X + Render->Texture->Width * 0.5f),(s32)(Position->Y + Render->Texture->Height * 0.5f));
+    Pushbuffer_Push_Rect_Texture(Pushbuffer, Render->Texture->Memory, Min, Max, Render->FlippedZ);
 
   }
 
@@ -115,15 +116,68 @@ void CreatePlayer(game_state * GameState){
   health_component Health = {};
   Health.Health = 3;
   position_component Position = {};
-  Position.Position = V2f(200, 550);
+  Position.X = 200;
+  Position.Y = 550;
   velocity_component Velocity= {};
   render_component Render= {};
   const char * PlayerTextureName = "spaceShips1";
   Render.Texture = GetTextureByName(GameState, (u8*)PlayerTextureName);
   Render.Alpha = 1;
+  Render.FlippedZ = true;
   collider_component Collider= {};
   Collider.Extents = V2f(Render.Texture->Width * 0.5f, Render.Texture->Height  * 0.5f);
   EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 5, &Health, &Position, &Velocity, &Render, &Collider);
+  GameState->PlayerEntity = Entity;
+
+}
+
+void UseInput(game_state * GameState, game_input * Input)
+{
+
+  entity Entity =GameState->PlayerEntity;
+  velocity_component * Velocity = (velocity_component*) EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, VELOCITY_ID);
+
+  Velocity->X = 0;
+  Velocity->Y = 0;
+
+  float PlayerVelocity = 10.0f;
+  float DeltaTime = GameState->DeltaTime;
+  if(Input->Up){
+    Velocity->Y -= PlayerVelocity * DeltaTime;
+
+  }
+  if(Input->Left){
+    Velocity->X -= PlayerVelocity * DeltaTime;
+  }
+  if(Input->Right){
+    Velocity->X += PlayerVelocity * DeltaTime;
+  }
+  if(Input->Down){
+    Velocity->Y += PlayerVelocity * DeltaTime;
+  }
+
+  vec2f NormalizedVelocity = Vec2f_NormalizeSafe(V2f(Velocity->X, Velocity->Y));
+  Velocity->X = NormalizedVelocity.X;
+  Velocity->Y = NormalizedVelocity.Y;
+
+  // u32 Shoot;
+
+}
+
+void UpdatePhysics(game_state * GameState)
+{
+
+  query_result Query = EntityManager_Query(&GameState->EntityManager, VELOCITY_MASK | POSITION_MASK);
+  for(u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++){
+    entity Entity = Query.Ids[QueryIndex];
+
+    position_component * Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
+    velocity_component * Velocity= (velocity_component*) EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, VELOCITY_ID);
+
+    Position->X += Velocity->X * GameState->DeltaTime;
+    Position->Y += Velocity->Y * GameState->DeltaTime;
+
+  }
 
 }
 
@@ -131,6 +185,7 @@ GAME_UPDATE(GameUpdate)
 {
   Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
   game_state* GameState = (game_state*)Memory->PermanentStorage;
+  GameState->DeltaTime = Memory->DeltaTime;
   if (!Memory->IsInitialized)
   {
     // Initialize GameArena
@@ -154,7 +209,9 @@ GAME_UPDATE(GameUpdate)
 
   // Use input
   //  i.e set velocity and figure out if we shoot
+  UseInput(GameState, Input);
   // Update physics
+  UpdatePhysics(GameState);
   // Collision detection and collision response
 
   Render(GameState, Pushbuffer);
