@@ -9,7 +9,6 @@ typedef enum command_type
 {
   Command_SpawnEnemy,  // Needs the EntityManager
   Command_DecideSpawn, // Just needs the CommandBuffer
-  Command_EnemyShoot   // Needs the EntityManager
 } command_type;
 
 typedef struct command command;
@@ -17,13 +16,15 @@ struct command
 {
   f32          Time;
   command_type Type;
-  entity       Entity; // Used for shoot!
+  u32 EnemiesToSpawn;
 };
 
 typedef struct command_buffer
 {
+  f32      Time;
   command* Commands;
   u32      MaxCommands;
+  u32      CommandCount;
 } command_buffer;
 
 typedef struct texture_node texture_node;
@@ -42,7 +43,8 @@ typedef struct game_state
   entity_manager EntityManager;
   entity         PlayerEntity;
   texture*       Textures;
-  u32 ScreenWidth, ScreenHeight;
+  command_buffer CommandBuffer;
+  u32            ScreenWidth, ScreenHeight;
   u32            TextureCount;
   f32            DeltaTime;
   vec2f          PlayerPosition;

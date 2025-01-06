@@ -341,7 +341,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     if (FrameTimeMS < TargetFrameTimeMS)
     {
       u32 TimeToSleep = TargetFrameTimeMS - FrameTimeMS;
-      DeltaTime = (TargetFrameTimeMS / 1000.0f) - FrameTimeMSF;
+      DeltaTime = 1.0f / 30.0f;
       Sleep(TimeToSleep);
     }else{
       DeltaTime = FrameTimeMSF;

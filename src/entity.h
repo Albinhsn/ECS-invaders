@@ -44,6 +44,8 @@ typedef struct render_component
 
 #define ENEMY_MASK  (1 << 1)
 #define PLAYER_MASK (1 << 2)
+#define ENEMY_BULLET_MASK  (1 << 3)
+#define PLAYER_BULLET_MASK (1 << 4)
 
 typedef struct collider_component
 {

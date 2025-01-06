@@ -144,7 +144,7 @@ void UseInput(game_state* GameState, game_input* Input)
   Velocity->X                        = 0;
   Velocity->Y                        = 0;
 
-  float PlayerVelocity               = 1.0f;
+  float PlayerVelocity               = 100.0f;
   float DeltaTime                    = GameState->DeltaTime;
   if (Input->Up)
   {
@@ -164,8 +164,8 @@ void UseInput(game_state* GameState, game_input* Input)
   }
 
   vec2f NormalizedVelocity = Vec2f_NormalizeSafe(V2f(Velocity->X, Velocity->Y));
-  Velocity->X              = NormalizedVelocity.X * PlayerVelocity * DeltaTime;
-  Velocity->Y              = NormalizedVelocity.Y * PlayerVelocity * DeltaTime;
+  Velocity->X              = NormalizedVelocity.X * PlayerVelocity;
+  Velocity->Y              = NormalizedVelocity.Y * PlayerVelocity;
 
   // u32 Shoot;
   if (Input->Shoot)
@@ -180,9 +180,9 @@ void UseInput(game_state* GameState, game_input* Input)
     Render.Texture              = GetTextureByName(GameState, (u8*)TextureName);
     Render.FlippedZ             = false;
     velocity_component Velocity = {};
-    Velocity.Y                  = 5.0f;
+    Velocity.Y                  = -200.0f;
     collider_component Collider = {};
-    Collider.ColliderIsMask     = PLAYER_MASK;
+    Collider.ColliderIsMask     = PLAYER_BULLET_MASK;
     Collider.CanCollideWithMask = ENEMY_MASK;
     EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 4, &Position, &Velocity, &Render, &Collider);
   }
@@ -272,14 +272,11 @@ void RemoveDeadUnits(game_state* GameState)
   }
 }
 
-void SpawnEnemy(game_state* GameState, vec2f Pos)
+void SpawnEnemy(game_state* GameState, position_component Position)
 {
-  u32                Mask      = COLLIDER_MASK | RENDER_MASK | POSITION_MASK | HEALTH_MASK;
+  u32                Mask      = COLLIDER_MASK | RENDER_MASK | POSITION_MASK | HEALTH_MASK | VELOCITY_MASK;
   entity             Entity    = EntityManager_Create_Entity(&GameState->EntityManager, Mask);
 
-  position_component Position  = {};
-  Position.X                   = Pos.X;
-  Position.Y                   = Pos.Y;
   health_component Health      = {};
   Health.Health                = 1;
   render_component Render      = {};
@@ -289,8 +286,11 @@ void SpawnEnemy(game_state* GameState, vec2f Pos)
   collider_component Collider  = {};
   Collider.Extents             = V2f(Render.Texture->Width * 0.5f, Render.Texture->Height * 0.5f);
   Collider.ColliderIsMask      = ENEMY_MASK;
-  Collider.CanCollideWithMask  = PLAYER_MASK;
-  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 4, &Health, &Position,  &Render, &Collider);
+  Collider.CanCollideWithMask  = PLAYER_MASK | PLAYER_BULLET_MASK;
+  velocity_component Velocity = {};
+  Velocity.Y = 100.0f;
+
+  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 5, &Health, &Position, &Velocity, &Render, &Collider);
 }
 
 void RemoveOutOfBoundsUnits(game_state* GameState)
@@ -305,15 +305,107 @@ void RemoveOutOfBoundsUnits(game_state* GameState)
     position_component* Position = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
     collider_component* Collider = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, COLLIDER_ID);
 
-    if (!Collision_Rect_Rect(ScreenExtents, ScreenCenter, Collider->Extents, V2f(Position->X, Position->Y)))
+    if (Collider->ColliderIsMask != ENEMY_MASK && !Collision_Rect_Rect(ScreenExtents, ScreenCenter, Collider->Extents, V2f(Position->X, Position->Y)))
     {
       EntityManager_Remove_Entity(&GameState->EntityManager, Entity);
     }
   }
 }
 
+position_component GetRandomEnemySpawnPosition(game_state* GameState)
+{
+  position_component Result = {};
+  Result.X                  = rand() / (f32)RAND_MAX * GameState->ScreenWidth;
+  Result.Y                  = rand() / (f32)RAND_MAX * GameState->ScreenHeight * -0.25f - GameState->ScreenHeight * 0.2f;
+
+  Result.Rotation           = 0;
+
+  return Result;
+}
+
 void RespawnOutOfBoundsEnemies(game_state* GameState)
 {
+
+  query_result Query = EntityManager_Query(&GameState->EntityManager, COLLIDER_MASK);
+  u32          Count = Query.Count;
+  for (u32 QueryIndex = 0; QueryIndex < Count; QueryIndex++)
+  {
+    entity              Entity   = Query.Ids[QueryIndex];
+    collider_component* Collider = (collider_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, COLLIDER_ID);
+    if (Collider->ColliderIsMask == ENEMY_MASK)
+    {
+      position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
+
+      if (Position->Y + Collider->Extents.Y > GameState->ScreenHeight)
+      {
+        position_component SpawnPosition = GetRandomEnemySpawnPosition(GameState);
+        *Position                        = SpawnPosition;
+      }
+    }
+  }
+}
+
+void CommandBuffer_PushCommand(command_buffer* Buffer, command Command)
+{
+  Buffer->Commands[Buffer->CommandCount++] = Command;
+}
+
+void CommandBuffer_PushSpawnEnemy(command_buffer* Buffer, f32 Time)
+{
+  command Command = {};
+  Command.Time    = Time;
+  Command.Type    = Command_SpawnEnemy;
+  CommandBuffer_PushCommand(Buffer, Command);
+}
+
+void CommandBuffer_PushDecideSpawn(command_buffer* Buffer, f32 Time, u32 EnemiesToSpawn)
+{
+  command Command = {};
+  Command.Time    = Time;
+  Command.Type    = Command_DecideSpawn;
+  Command.EnemiesToSpawn = EnemiesToSpawn;
+  CommandBuffer_PushCommand(Buffer, Command);
+}
+void ExecuteNewCommands(game_state* GameState)
+{
+  command_buffer* Buffer = &GameState->CommandBuffer;
+  Buffer->Time += GameState->DeltaTime;
+  Assert(Buffer->Time > 0);
+  for (s32 CommandIndex = Buffer->CommandCount - 1; CommandIndex >= 0; CommandIndex--)
+  {
+    command* Command = &Buffer->Commands[CommandIndex];
+    if (Command->Time < Buffer->Time)
+    {
+      switch (Command->Type)
+      {
+      case Command_SpawnEnemy:
+      {
+        position_component Position = GetRandomEnemySpawnPosition(GameState);
+        SpawnEnemy(GameState, Position);
+        break;
+      }
+      case Command_DecideSpawn:
+      {
+        for(u32 EnemyIndex = 0; EnemyIndex < Command->EnemiesToSpawn; EnemyIndex++){
+            f32 AdditionalTime = rand() / (f32)RAND_MAX * 10.0f;
+            CommandBuffer_PushSpawnEnemy(Buffer, Buffer->Time + AdditionalTime);
+        }
+        f32 TimeUntilNextDecision = 10.0f;
+        u32 NextNumberOfEnemiesToSpawn = Command->EnemiesToSpawn >= 10 ? 10 : Command->EnemiesToSpawn + 2;
+        CommandBuffer_PushDecideSpawn(Buffer, Buffer->Time + TimeUntilNextDecision, NextNumberOfEnemiesToSpawn);
+        break;
+      }
+      default:
+      {
+        Assert(0 && "Unimplemented command type!");
+      }
+      }
+
+      Buffer->CommandCount--;
+      Buffer->Commands[CommandIndex] = Buffer->Commands[Buffer->CommandCount];
+
+    }
+  }
 }
 
 void CleanupEntities(game_state* GameState)
@@ -327,6 +419,7 @@ GAME_UPDATE(GameUpdate)
 {
   Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
   game_state* GameState = (game_state*)Memory->PermanentStorage;
+  Assert(GameState->CommandBuffer.Time >= 0);
   GameState->DeltaTime  = Memory->DeltaTime;
   if (!Memory->IsInitialized)
   {
@@ -340,23 +433,31 @@ GAME_UPDATE(GameUpdate)
     u64 TemporaryStorageSize = Memory->TemporaryStorageSize;
     Arena_Create(&GameState->TemporaryArena, Memory->TemporaryStorage, TemporaryStorageSize);
 
+    GameState->CommandBuffer.MaxCommands  = 128;
+    GameState->CommandBuffer.Commands     = Arena_Allocate(&GameState->PermanentArena, sizeof(command) * GameState->CommandBuffer.MaxCommands);
+    GameState->CommandBuffer.CommandCount = 0;
+
+    CommandBuffer_PushDecideSpawn(&GameState->CommandBuffer, 0, 2);
+
     LoadTextures(GameState, Memory);
 
     EntityManager_Create(&GameState->PermanentArena, &GameState->EntityManager, 256, 5, sizeof(health_component), sizeof(position_component), sizeof(velocity_component), sizeof(render_component),
                          sizeof(collider_component));
     CreatePlayer(GameState);
-    SpawnEnemy(GameState, V2f(200, 200));
     Memory->IsInitialized = true;
   }
   // Omega slow :)
   // Arena_Clear(&GameState->TemporaryArena);
 
   UseInput(GameState, Input);
+  ExecuteNewCommands(GameState);
   UpdatePhysics(GameState);
-  // Collision detection and collision response
 
   CollisionDetection(GameState);
   CleanupEntities(GameState);
 
   RenderObjects(GameState, Pushbuffer);
+  {
+    Assert(GameState->CommandBuffer.Time >= 0);
+  }
 }

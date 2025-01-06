@@ -2,7 +2,7 @@
 
 void EntityManager_Create(arena* Arena, entity_manager* Manager, u32 MaxEntityCount, u32 ComponentCount, ...)
 {
-  Assert(ComponentCount > 31 && "To many components!");
+  Assert(ComponentCount <= 31 && "To many components!");
   va_list ComponentSizes;
   va_start(ComponentSizes, ComponentCount);
 

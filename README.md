@@ -26,13 +26,9 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading and 
 
 
 # ToDo
-* TeamComponent?    
-    * No you do it via collision masks
-* EnemyManager
-    * I.e just a heap that constantly pushes SpawnEnemyCommands etc
 * Get a handle of the timer stuff in win32
+* Fix dt bug?
 * Make the actual drawings we do be targeting a bitmap not always the actual framebuffer
-* Rendering bug when we're outside of the screen
 * Look at Handmade Hero for rendering scaled/rotated rectangles and texture mapping
     * We need to send a basis, since it's 2d a rotation is enough
     * These are day 92 and 93 respectively!!!

@@ -28,7 +28,7 @@ typedef double   f64;
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
 #define Assert(Expr)                                                                                                                                                                                   \
-  if (!Expr)                                                                                                                                                                                           \
+  if (!(Expr))                                                                                                                                                                                           \
     int a = *(int*)0;
 
 typedef struct arena
