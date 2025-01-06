@@ -31,12 +31,6 @@ typedef double   f64;
   if (!Expr)                                                                                                                                                                                           \
     int a = *(int*)0;
 
-typedef struct string
-{
-  u8 * Buffer;
-  u32 Length;
-}string;
-
 typedef struct arena
 {
   void* Memory;
@@ -44,14 +38,27 @@ typedef struct arena
   u64   Offset;
 } arena;
 
+typedef struct string
+{
+  u8* Buffer;
+  u32 Length;
+} string;
+
+void String_Create(arena* Arena, string* String, u8* Buffer, u32 Length)
+{
+}
+
+f32 Abs(f32 x){
+  return x < 0 ? -x : x;
+}
 
 typedef struct texture texture;
 struct texture
 {
-  void*    Memory;
-  u32      Width;
-  u32      Height;
-  string   Name;
+  void*  Memory;
+  u32    Width;
+  u32    Height;
+  string Name;
 };
 
 typedef struct pool_free_node pool_free_node;
@@ -61,19 +68,19 @@ struct pool_free_node
 };
 typedef struct pool_allocator
 {
-  void * Memory;
-  u64 Size;
-  u64 ChunkSize;
-  pool_free_node * Head;
+  void*           Memory;
+  u64             Size;
+  u64             ChunkSize;
+  pool_free_node* Head;
 } pool_allocator;
 
-void Memcpy(u8 * Dest, u8 * Src, u32 Count)
+void Memcpy(u8* Dest, u8* Src, u32 Count)
 {
 
-  for(u32 BufferIndex = 0; BufferIndex < Count; BufferIndex++){
+  for (u32 BufferIndex = 0; BufferIndex < Count; BufferIndex++)
+  {
     Dest[BufferIndex] = Src[BufferIndex];
   }
-
 }
 
 void* Pool_Alloc(pool_allocator* Pool)
@@ -90,36 +97,38 @@ void* Pool_Alloc(pool_allocator* Pool)
   return memset(Node, 0, Pool->ChunkSize);
 }
 
-
-
-bool IsAlphaOrDigit(u8 Char){
+bool IsAlphaOrDigit(u8 Char)
+{
   bool IsAlpha = (Char >= 'a' && Char <= 'z') || (Char >= 'A' && Char <= 'Z');
   bool IsDigit = (Char >= '0' && Char <= '9');
   return IsAlpha | IsDigit;
 }
 
-u32 String_Length(u8 * Buffer){
+u32 String_Length(u8* Buffer)
+{
   u32 Length = 0;
-  while(Buffer[Length] != '\0'){
+  while (Buffer[Length] != '\0')
+  {
     Length++;
   }
   return Length;
 }
 
-bool String_Compare(string * s0, string * s1)
+bool String_Compare(string* s0, string* s1)
 {
-  if(s0->Length != s1->Length){
+  if (s0->Length != s1->Length)
+  {
     return false;
   }
-  for(u32 CharIndex = 0; CharIndex < s0->Length; CharIndex++){
-    if(s0->Buffer[CharIndex] != s1->Buffer[CharIndex]){
+  for (u32 CharIndex = 0; CharIndex < s0->Length; CharIndex++)
+  {
+    if (s0->Buffer[CharIndex] != s1->Buffer[CharIndex])
+    {
       return false;
     }
   }
   return true;
-
 }
-
 
 void Pool_Free(pool_allocator* Pool, u64 Ptr)
 {
@@ -138,8 +147,8 @@ void Pool_Free(pool_allocator* Pool, u64 Ptr)
   }
 
   pool_free_node* Node = (pool_free_node*)Ptr;
-  Node->Next         = Pool->Head;
-  Pool->Head         = Node;
+  Node->Next           = Pool->Head;
+  Pool->Head           = Node;
 }
 void Pool_Free_All(pool_allocator* Pool)
 {
@@ -147,10 +156,10 @@ void Pool_Free_All(pool_allocator* Pool)
 
   for (u64 i = 0; i < ChunkCount; i++)
   {
-    u8* Ptr  = (u8*)Pool->Memory + Pool->ChunkSize * i;
+    u8*             Ptr  = (u8*)Pool->Memory + Pool->ChunkSize * i;
     pool_free_node* Node = (pool_free_node*)Ptr;
-    Node->Next         = Pool->Head;
-    Pool->Head         = Node;
+    Node->Next           = Pool->Head;
+    Pool->Head           = Node;
   }
 }
 u64 AlignOffset(u64 offset, u64 alignment)
@@ -166,9 +175,9 @@ u64 AlignOffset(u64 offset, u64 alignment)
 #define DEFAULT_ALIGNMENT 16
 void Pool_Create(pool_allocator* Pool, void* Memory, u64 ChunkSize)
 {
-  Pool->Memory     = Memory;
-  Pool->ChunkSize= AlignOffset(ChunkSize, DEFAULT_ALIGNMENT);
-  Pool->Head       = 0;
+  Pool->Memory    = Memory;
+  Pool->ChunkSize = AlignOffset(ChunkSize, DEFAULT_ALIGNMENT);
+  Pool->Head      = 0;
 
   Pool_Free_All(Pool);
 }

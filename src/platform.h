@@ -12,7 +12,11 @@ typedef struct game_memory
 
   void* PermanentStorage;
   u64   PermanentSize;
-  f32 DeltaTime;
+
+  // Idk why they're here
+  f32   DeltaTime;
+  u16   ScreenWidth;
+  u16   ScreenHeight;
   bool (*ReadFile)(arena* Arena, const char* Filename, u8** Buffer, u32* Size);
 } game_memory;
 

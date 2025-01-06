@@ -62,23 +62,25 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
       s32                           Height      = Renderer->Height;
       pushbuffer_entry_rect_texture Entry       = Pushbuffer_Read(Pushbuffer, pushbuffer_entry_rect_texture);
 
-      u32                           MinX        = Entry.Min.X < 0 ? 0 : Entry.Min.X;
-      u32                           MinY        = Entry.Min.Y < 0 ? 0 : Entry.Min.Y;
+      s32                           MinX        = Entry.Min.X < 0 ? 0 : Entry.Min.X;
+      s32                           MinY        = Entry.Min.Y < 0 ? 0 : Entry.Min.Y;
 
-      u32                           MaxX        = Entry.Max.X > Width ? Width : Entry.Max.X;
-      u32                           MaxY        = Entry.Max.Y > Height ? Height : Entry.Max.Y;
+      s32                           MaxX        = Entry.Max.X > Width ? Width : Entry.Max.X;
+      s32                           MaxY        = Entry.Max.Y > Height ? Height : Entry.Max.Y;
 
       u32*                          Buffer      = Renderer->Buffer;
       u32*                          ImageBuffer = Entry.Memory;
 
-      u32                           ImageWidth  = Entry.Max.X - Entry.Min.X;
+      s32                           ImageWidth  = Entry.Max.X - Entry.Min.X;
+      ImageWidth += Entry.Min.X < 0 ? 1 : 0;
+      s32 XOffset = Entry.Min.X < 0 ? -Entry.Min.X : 0;
 
-      for (u32 Y = MinY; Y < MaxY; Y++)
+      for (s32 Y = MinY; Y < MaxY; Y++)
       {
-        for (u32 X = MinX; X < MaxX; X++)
+        for (s32 X = MinX; X < MaxX; X++)
         {
-          u32 YOffset     = Entry.FlippedZ ? MaxY - Y - 1 : Y - MinY;
-          u32 ImageOffset = (YOffset)*ImageWidth + (X - MinX);
+          s32 YOffset     = Entry.FlippedZ ? MaxY - 1 - Y : (Y - MinY);
+          s32 ImageOffset = YOffset * ImageWidth + (X - MinX + XOffset);
           u32 Color       = *(ImageBuffer + ImageOffset);
           u32 DestAlpha   = Color >> 24;
           if (DestAlpha != 0)
