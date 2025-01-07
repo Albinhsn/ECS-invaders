@@ -21,6 +21,7 @@ typedef double   f64;
 #define false             0
 
 #define bool              u32
+#define PI 3.141592653589793
 
 #define Kilobyte(size)    (size * 1024LL)
 #define Megabyte(size)    (Kilobyte(size) * 1024LL)

@@ -70,7 +70,7 @@ typedef struct win32_audio
   IMMDevice*           Device;
   IAudioClient*        AudioClient;
   IAudioRenderClient*  RenderClient;
-  WAVEFORMATEX*        WaveFormat;
+  WAVEFORMATEXTENSIBLE*        WaveFormat;
   u32                  BufferFrameCount;
   HANDLE RefillEvent;
 } win32_audio;

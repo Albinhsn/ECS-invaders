@@ -1,6 +1,11 @@
 # Invaders
 Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading and a bunch of other things
 
+The ECS way is to create systems or components to solve things
+* Needs extra data for something
+    * Create a component
+* THen create the system that solves that problem
+
 # Things i'd like to solve in this project
 * ECS
 * Basic Audio
@@ -20,7 +25,7 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading and 
 * Linux support
 * D3D11 Support
 * Record and store inputs for playback
-* SIMD 
+* SIMD
 * Work Queue
 * Roll your own printf
 
@@ -49,9 +54,9 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading and 
     * DecideWhenToSpawnEnemies
     * EnemyShoot
 
-* UI 
+* UI
     * Button
-    * Text 
+    * Text
 
 * Audio
     * Shoot Bullet

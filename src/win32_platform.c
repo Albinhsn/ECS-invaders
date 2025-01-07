@@ -282,15 +282,19 @@ bool Win32_InitAudio()
     return false;
   }
 
+  WAVEFORMATEX * WaveFormat = 0;
   Result = GlobalAudio.AudioClient->lpVtbl->GetMixFormat(GlobalAudio.AudioClient,
-                                                         &GlobalAudio.WaveFormat // Pointer to the pointer to the waveformat which it will fill
+                                                         &WaveFormat // Pointer to the pointer to the waveformat which it will fill
   );
   if (FAILED(Result))
   {
     OutputDebugStringA("Failed to get wave format\n");
     return false;
   }
-  // Assert that the wave format is what we wanted?
+  // Extensible
+  GlobalAudio.WaveFormat = (WAVEFORMATEXTENSIBLE*)WaveFormat;
+  Assert(GlobalAudio.WaveFormat->Format.wFormatTag == 0xFFFE); // Is extended format
+  Assert(GlobalAudio.WaveFormat->SubFormat.Data1 == 3); // Is floating point
 
   // Initialize audio stream
   REFERENCE_TIME BufferDuration   = 30 * 1000; // 30 ms
@@ -300,7 +304,7 @@ bool Win32_InitAudio()
                                                                                 AudioClientFlags,         //  Flags to control creation of the stream.
                                                                                 BufferDuration,           // Duration of the buffer
                                                                                 0,                        // Should always be 0 in shared mode, otherwise always nonzero
-                                                                                GlobalAudio.WaveFormat,   // Pointer to the wave format
+                                                                                (WAVEFORMATEX*)GlobalAudio.WaveFormat,   // Pointer to the wave format
                                                                                 0 // Pointer to a session GUID, setting this to NULL is equivalent to passing ap ointer to a GUID_NULL
                            );
   if (FAILED(Result))
@@ -308,6 +312,8 @@ bool Win32_InitAudio()
     OutputDebugStringA("Failed to initialize audio client\n");
     return false;
   }
+  
+
 
   Result = GlobalAudio.AudioClient->lpVtbl->GetService(GlobalAudio.AudioClient, &IID_IAudioRenderClient, (void**)&GlobalAudio.RenderClient);
   if (FAILED(Result))
@@ -373,11 +379,36 @@ bool Win32_InitAudio()
 //   }
 // }
 
+#include <math.h>
+#define TAU (PI * 2)
+void Win32_OutputSineWave(u32 SamplesPerSecond, u32 SampleCount, f32 * Samples, f32 ToneHz, f32 ToneVolume)
+{
+  static f64 TSine = 0;
+  
+  f32 WavePeriod = SamplesPerSecond / ToneHz;
+
+  for(u32 SampleIndex = 0; SampleIndex < SampleCount; SampleIndex++)
+  {
+    f32 Sine = (f32)sin(TSine);
+    f32 Sample = (f32)(Sine * ToneVolume);
+    *Samples++ = Sample;
+    *Samples++ = Sample;
+
+    TSine += TAU / WavePeriod;
+    if(TSine >= TAU){
+      TSine -= TAU;
+    }
+
+  }
+
+}
+
 DWORD Win32_AudioThread_Main(void* Data)
 {
 
   u64 FramesWritten = 0;
   HRESULT Result;
+  GlobalAudio.AudioClient->lpVtbl->Start(GlobalAudio.AudioClient);
   while (true)
   {
     DWORD GotEvent = WaitForSingleObject(GlobalAudio.RefillEvent, INFINITE);
@@ -399,6 +430,10 @@ DWORD Win32_AudioThread_Main(void* Data)
         Result = GlobalAudio.RenderClient->lpVtbl->GetBuffer(GlobalAudio.RenderClient, SampleCount, &BufferData);
 
         // Here we write into the sound buffer
+        // We assume this is floating point still!
+        f32 * Samples = (f32*)BufferData;
+        u32 SamplesPerSecond = GlobalAudio.WaveFormat->Format.nSamplesPerSec;
+        Win32_OutputSineWave(SamplesPerSecond, SampleCount, Samples, 440, 0.5);
 
         Result = GlobalAudio.RenderClient->lpVtbl->ReleaseBuffer(GlobalAudio.RenderClient, SampleCount, 0);
 
@@ -431,6 +466,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   }
   // Run a separate thread for audio
   GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
+  SetThreadPriority(GlobalAudioThread.Handle, THREAD_PRIORITY_TIME_CRITICAL);
   if (GlobalAudioThread.Handle == 0)
   {
     OutputDebugStringA("Failed to create audio thread!\n");
