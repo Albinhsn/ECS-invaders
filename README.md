@@ -42,11 +42,24 @@ The ECS way is to create systems or components to solve things
 * Look at Handmade Hero for rendering scaled/rotated rectangles and texture mapping
     * We need send a basis
       * I.e we send a origin, x/y axis (x/y axis include the width/height)
-    * Then just use the dot product to figure out if the pixel is inside
+    * Then just use the dot product to figure out if the pixel is inside on each of the 4 edges
+        * Do this with just a rectangle first
+    * Then we just need to get the UV coordinates and do a bilinear sample
+        * How does this work with scaling?
+            * You base it of the width of your drawing, not the image width
 
 * Audio
     * Write a WAV parser
+    * Figure out how we want to send sound from game <-> platform
+        * Commands?
+        * Different buffer?
+        * This feels like it's just play and then you store what sounds you want, for how long etc
+            * PlaySound(&Sound, Description);
+                * Should the Usage code look like at least
+            * Just store an Array of sounds that are currently playing
+        * Do it in 32-bit float :)
     * Sound Mixer
+
 * UI
     * IM Layout library
     * Render the layout
