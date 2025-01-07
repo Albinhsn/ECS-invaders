@@ -28,6 +28,8 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading and 
 # ToDo
 * Get a handle of the timer stuff in win32
 * Fix dt bug?
+* Make enemies shoot as well
+    * Both you and this can have a cd and just check it?
 * Make the actual drawings we do be targeting a bitmap not always the actual framebuffer
 * Look at Handmade Hero for rendering scaled/rotated rectangles and texture mapping
     * We need to send a basis, since it's 2d a rotation is enough

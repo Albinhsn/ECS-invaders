@@ -1,4 +1,5 @@
 #include "common.h"
+
 #include <windows.h>
 
 #include "image.c"
@@ -14,6 +15,8 @@ static win32_software_renderer GlobalRenderer;
 
 static const char*             GlobalTempPath    = "../build/lock.tmp";
 static const char*             GlobalLibraryPath = "../build/invaders.dll";
+static win32_thread            GlobalAudioThread;
+static win32_audio             GlobalAudio;
 
 static void*                   Win32_Allocate(u64 size)
 {
@@ -235,8 +238,203 @@ bool Win32_ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Si
   return true;
 }
 
+bool Win32_InitAudio()
+{
+  HRESULT Result;
+
+  // Init COM library
+  Result = CoInitializeEx(0, COINIT_MULTITHREADED);
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to init COM\n");
+    return false;
+  }
+
+  // Get the default audio endpoint
+  Result = CoCreateInstance(&CLSID_MMDeviceEnumerator,      // The CLSID associated with the data and code that will be used to create the object
+                            0,                              // Pointer to the aggregate object's IUnknown Interface
+                            CLSCTX_ALL,                     // Context in which the code that manages the newly created object will run in (CLSCTX enum)
+                            &IID_IMMDeviceEnumerator,       //  Reference to the identifier of the interface used to communicate with the object
+                            (void**)&GlobalAudio.Enumerator // Address of the pointer variable that receives the interface pointer requested in riid (value above). Is 0 if it failed to create it
+  );
+
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("CoCreateInstance failed\n");
+    return false;
+  }
+
+  Result = GlobalAudio.Enumerator->lpVtbl->GetDefaultAudioEndpoint(GlobalAudio.Enumerator, // explicit "this"
+                                                                   eRender,                // The data flow direction for  rendering device (otherwise capture and eCapture)
+                                                                   eConsole,               // role of the endpoint device, either eConsole, eMultimedai and eCommunications
+                                                                   &GlobalAudio.Device     // Pointer to address of the IMMDevice interface of the endpoint object
+  );
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to get default audio endpoint\n");
+    return false;
+  }
+
+  Result = GlobalAudio.Device->lpVtbl->Activate(GlobalAudio.Device, &IID_IAudioClient, CLSCTX_ALL, 0, (void**)&GlobalAudio.AudioClient);
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to create audio client\n");
+    return false;
+  }
+
+  Result = GlobalAudio.AudioClient->lpVtbl->GetMixFormat(GlobalAudio.AudioClient,
+                                                         &GlobalAudio.WaveFormat // Pointer to the pointer to the waveformat which it will fill
+  );
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to get wave format\n");
+    return false;
+  }
+  // Assert that the wave format is what we wanted?
+
+  // Initialize audio stream
+  REFERENCE_TIME BufferDuration   = 30 * 1000; // 30 ms
+  u32            AudioClientFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST;
+  Result                          = GlobalAudio.AudioClient->lpVtbl->Initialize(GlobalAudio.AudioClient,
+                                                                                AUDCLNT_SHAREMODE_SHARED, // Shared mode or exclusive
+                                                                                AudioClientFlags,         //  Flags to control creation of the stream.
+                                                                                BufferDuration,           // Duration of the buffer
+                                                                                0,                        // Should always be 0 in shared mode, otherwise always nonzero
+                                                                                GlobalAudio.WaveFormat,   // Pointer to the wave format
+                                                                                0 // Pointer to a session GUID, setting this to NULL is equivalent to passing ap ointer to a GUID_NULL
+                           );
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to initialize audio client\n");
+    return false;
+  }
+
+  Result = GlobalAudio.AudioClient->lpVtbl->GetService(GlobalAudio.AudioClient, &IID_IAudioRenderClient, (void**)&GlobalAudio.RenderClient);
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to get render client\n");
+    return false;
+  }
+
+  // Get the buffer frame count
+  Result = GlobalAudio.AudioClient->lpVtbl->GetBufferSize(GlobalAudio.AudioClient, &GlobalAudio.BufferFrameCount);
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to get buffer size\n!");
+    return false;
+  }
+
+  GlobalAudio.RefillEvent = CreateEventEx(0,                               // pointer to SECURITY_ATTRIBUTES structure
+                                          0,                               // Name of the event object, if NULL object is created without a name
+                                          0,                               // includes CREATE_EVENT_INITIAL_SET and CREATE_EVENT_MANUAL_RESET
+                                          EVENT_MODIFY_STATE | SYNCHRONIZE // Access mask for the event object
+  );
+  Result                  = GlobalAudio.AudioClient->lpVtbl->SetEventHandle(GlobalAudio.AudioClient, GlobalAudio.RefillEvent);
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to set event handle\n");
+    return false;
+  }
+
+  // Set the data buffer to silent first
+  u8* Data = 0;
+  Result   = GlobalAudio.RenderClient->lpVtbl->GetBuffer(GlobalAudio.RenderClient, GlobalAudio.BufferFrameCount, &Data);
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to get the buffer!\n");
+    return false;
+  }
+  Result = GlobalAudio.RenderClient->lpVtbl->ReleaseBuffer(GlobalAudio.RenderClient, GlobalAudio.BufferFrameCount, AUDCLNT_BUFFERFLAGS_SILENT);
+  if (FAILED(Result))
+  {
+    OutputDebugStringA("Failed to release the buffer!\n");
+    return false;
+  }
+
+  return true;
+}
+// internal void
+// GameOutputSound(game_state* GameState, game_sound_output_buffer* SoundBuffer, int ToneHz)
+// {
+//   int16  ToneVolume = 3000;
+//   int    WavePeriod = SoundBuffer->SamplesPerSecond / ToneHz;
+
+//   int16* SampleOut  = SoundBuffer->Samples;
+//   for (int SampleIndex = 0; SampleIndex < SoundBuffer->SampleCount; ++SampleIndex)
+//   {
+// #if 0
+//         real32 SineValue = sinf(GameState->tSine);
+//         int16 SampleValue = (int16)(SineValue * ToneVolume);
+// #else
+//     int16 SampleValue = 0;
+// #endif
+//     *SampleOut++ = SampleValue;
+//     *SampleOut++ = SampleValue;
+//   }
+// }
+
+DWORD Win32_AudioThread_Main(void* Data)
+{
+
+  u64 FramesWritten = 0;
+  HRESULT Result;
+  while (true)
+  {
+    DWORD GotEvent = WaitForSingleObject(GlobalAudio.RefillEvent, INFINITE);
+  
+    // Wait for event
+    if (GotEvent == WAIT_OBJECT_0)
+    {
+      // ToDo check for device change with guids!
+
+      u32 BufferSpaceAvailable = 0;
+      Result = GlobalAudio.AudioClient->lpVtbl->GetCurrentPadding(GlobalAudio.AudioClient, &BufferSpaceAvailable);
+      if(Result == AUDCLNT_E_DEVICE_INVALIDATED){
+        // Handle invalid device
+      }
+
+      u32 SampleCount = GlobalAudio.BufferFrameCount - BufferSpaceAvailable;
+      if(SampleCount > 0){
+        u8 *BufferData = 0;
+        Result = GlobalAudio.RenderClient->lpVtbl->GetBuffer(GlobalAudio.RenderClient, SampleCount, &BufferData);
+
+        // Here we write into the sound buffer
+
+        Result = GlobalAudio.RenderClient->lpVtbl->ReleaseBuffer(GlobalAudio.RenderClient, SampleCount, 0);
+
+      }
+    }
+  }
+
+  return 0;
+}
+
+void Win32_UninitAudio()
+{
+  // This has to be called from the same thread that created it
+  GlobalAudio.RenderClient->lpVtbl->Release(GlobalAudio.RenderClient);
+  CoTaskMemFree(GlobalAudio.WaveFormat);
+  GlobalAudio.AudioClient->lpVtbl->Release(GlobalAudio.AudioClient);
+  GlobalAudio.Device->lpVtbl->Release(GlobalAudio.Device);
+  GlobalAudio.Enumerator->lpVtbl->Release(GlobalAudio.Enumerator);
+
+  CoUninitialize();
+}
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
+
+  bool InitializedAudio = Win32_InitAudio();
+  if (!InitializedAudio)
+  {
+    OutputDebugStringA("Failed to init Audio!\n");
+  }
+  // Run a separate thread for audio
+  GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
+  if (GlobalAudioThread.Handle == 0)
+  {
+    OutputDebugStringA("Failed to create audio thread!\n");
+  }
 
   const char* WindowClassName = "Window Class";
 
@@ -272,15 +470,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   arena GameArena      = {};
   Arena_Create(&GameArena, Memory, GameMemorySize);
 
-  const char* Filename   = "../assets/spaceShips_001.tga";
-  u8*         FileBuffer = {};
-  u32         Size;
-  Win32_ReadFile(&GameArena, Filename, &FileBuffer, &Size);
-  targa_image Image = {};
-  Image_LoadTarga(&GameArena, &Image, FileBuffer, Size);
-
-  Targa_SavePPM(&Image);
-
   Win32_Create_Renderer(&GlobalRenderer, &GameArena);
 
   LARGE_INTEGER PerfCountFrequencyResult;
@@ -309,7 +498,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   u32           TargetFrameTimeMS = 33;
 
   GameMemory.ReadFile             = Win32_ReadFile;
-  f32 DeltaTime = TargetFrameTimeMS / 1000.0f;
+  f32 DeltaTime                   = TargetFrameTimeMS / 1000.0f;
   while (!GlobalShouldQuit)
   {
     if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath))
@@ -320,8 +509,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     Win32_ProcessMessages(&GameInput);
 
-    GameMemory.DeltaTime = DeltaTime;
-    GameMemory.ScreenWidth = GlobalScreenWidth;
+    GameMemory.DeltaTime    = DeltaTime;
+    GameMemory.ScreenWidth  = GlobalScreenWidth;
     GameMemory.ScreenHeight = GlobalScreenHeight;
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
 
@@ -329,27 +518,35 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     Pushbuffer_Reset(&Pushbuffer);
     Win32_RenderFramebuffer(hwnd);
 
-    LARGE_INTEGER CurrentTimer = Win32_GetTimeInSeconds();
-    u32           FrameTimeMS  = Win32_GetMillisecondsElapsed(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
-    f32           FrameTimeMSF  = Win32_GetMillisecondsElapsedF(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
+    LARGE_INTEGER CurrentTimer       = Win32_GetTimeInSeconds();
+    u32           FrameTimeMS        = Win32_GetMillisecondsElapsed(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
+    f32           FrameTimeMSF       = Win32_GetMillisecondsElapsedF(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
 
-    char FrameTimeBuf[1024] = {};
+    char          FrameTimeBuf[1024] = {};
     sprintf_s(FrameTimeBuf, ArrayCount(FrameTimeBuf), "Frame: %.4f\n", FrameTimeMSF);
     OutputDebugStringA(FrameTimeBuf);
-
 
     if (FrameTimeMS < TargetFrameTimeMS)
     {
       u32 TimeToSleep = TargetFrameTimeMS - FrameTimeMS;
-      DeltaTime = 1.0f / 30.0f;
+      DeltaTime       = 1.0f / 30.0f;
       Sleep(TimeToSleep);
-    }else{
+    }
+    else
+    {
       DeltaTime = FrameTimeMSF;
     }
 
-    CurrentTimer = Win32_GetTimeInSeconds();
+    CurrentTimer  = Win32_GetTimeInSeconds();
     PreviousTimer = CurrentTimer;
   }
+
+  bool Result = TerminateThread(GlobalAudioThread.Handle, 0);
+  if (!Result)
+  {
+    OutputDebugStringA("Failed to kill thread? GL\n");
+  }
+  Win32_UninitAudio();
 
   return 0;
 }

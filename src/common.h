@@ -28,8 +28,10 @@ typedef double   f64;
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
 #define Assert(Expr)                                                                                                                                                                                   \
-  if (!(Expr))                                                                                                                                                                                           \
-    int a = *(int*)0;
+  {                                                                                                                                                                                                    \
+    if (!(Expr))                                                                                                                                                                                       \
+      int a = *(int*)0;                                                                                                                                                                                \
+  }
 
 typedef struct arena
 {
@@ -48,7 +50,8 @@ void String_Create(arena* Arena, string* String, u8* Buffer, u32 Length)
 {
 }
 
-f32 Abs(f32 x){
+f32 Abs(f32 x)
+{
   return x < 0 ? -x : x;
 }
 
