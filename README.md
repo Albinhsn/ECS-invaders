@@ -33,12 +33,16 @@ The ECS way is to create systems or components to solve things
 # ToDo
 * Get a handle of the timer stuff in win32
 * Fix dt bug?
+* Make like a TypeComponent or smth
 * Make enemies shoot as well
     * Both you and this can have a cd and just check it?
 * Make the actual drawings we do be targeting a bitmap not always the actual framebuffer
+* Make the rect and texture take and X and Y axis
+
 * Look at Handmade Hero for rendering scaled/rotated rectangles and texture mapping
-    * We need to send a basis, since it's 2d a rotation is enough
-    * These are day 92 and 93 respectively!!!
+    * We need send a basis
+      * I.e we send a origin, x/y axis (x/y axis include the width/height)
+    * Then just use the dot product to figure out if the pixel is inside
 
 * Audio
     * Write a WAV parser

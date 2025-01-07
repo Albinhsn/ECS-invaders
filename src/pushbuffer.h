@@ -27,16 +27,18 @@ typedef struct pushbuffer_entry_clear
 
 typedef struct pushbuffer_entry_rect_color
 {
-  vec2i Min;
-  vec2i Max;
+  vec2f XAxis;
+  vec2f YAxis;
+  vec2f Origin;
   u32   Color;
 } pushbuffer_entry_rect_color;
 
 typedef struct pushbuffer_entry_rect_texture
 {
   u32* Memory;
-  vec2i Min;
-  vec2i Max;
+  vec2f XAxis;
+  vec2f YAxis;
+  vec2f Origin;
   bool FlippedZ;
 } pushbuffer_entry_rect_texture;
 
