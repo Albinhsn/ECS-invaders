@@ -4,13 +4,14 @@
 
 typedef struct sound
 {
-  u32 Channels;
+  f32 * Samples;
   u32 SampleRate;
   u32 ByteRate;
   u32 BlockAlign;
   u32 BitsPerSample;
-  void * Samples;
-  u16 SampleCount;
+  u32 SampleFrameCount;
+  u16 Channels;
+
 } sound;
 
 typedef struct playing_sound

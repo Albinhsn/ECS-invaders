@@ -360,31 +360,14 @@ bool Win32_InitAudio()
 
   return true;
 }
-// internal void
-// GameOutputSound(game_state* GameState, game_sound_output_buffer* SoundBuffer, int ToneHz)
-// {
-//   int16  ToneVolume = 3000;
-//   int    WavePeriod = SoundBuffer->SamplesPerSecond / ToneHz;
 
-//   int16* SampleOut  = SoundBuffer->Samples;
-//   for (int SampleIndex = 0; SampleIndex < SoundBuffer->SampleCount; ++SampleIndex)
-//   {
-// #if 0
-//         real32 SineValue = sinf(GameState->tSine);
-//         int16 SampleValue = (int16)(SineValue * ToneVolume);
-// #else
-//     int16 SampleValue = 0;
-// #endif
-//     *SampleOut++ = SampleValue;
-//     *SampleOut++ = SampleValue;
-//   }
-// }
 
 #include <math.h>
 #define TAU (PI * 2)
 void Win32_OutputSineWave(u32 SamplesPerSecond, u32 SampleCount, f32 * Samples, f32 ToneHz, f32 ToneVolume)
 {
   static f64 TSine = 0;
+
 
   f32 WavePeriod = SamplesPerSecond / ToneHz;
 
@@ -402,6 +385,23 @@ void Win32_OutputSineWave(u32 SamplesPerSecond, u32 SampleCount, f32 * Samples, 
 
   }
 
+}
+
+sound GlobalSound = {};
+
+void Win32_OutputTestSound(u32 SampleCount, f32 * Samples, f32 Volume)
+{
+  static u32 SoundSampleIndex = 0;
+
+  for(u32 SampleIndex = 0; SampleIndex < SampleCount; SampleIndex++)
+  {
+    f32 Sample0 = GlobalSound.Samples[SoundSampleIndex++];
+    *Samples++ = Sample0 * Volume;
+
+    f32 Sample1 = GlobalSound.Samples[SoundSampleIndex++];
+    *Samples++ = Sample1 * Volume;
+    SoundSampleIndex = (SoundSampleIndex) % (GlobalSound.SampleFrameCount * GlobalSound.Channels);
+  }
 }
 
 DWORD Win32_AudioThread_Main(void* Data)
@@ -434,7 +434,11 @@ DWORD Win32_AudioThread_Main(void* Data)
         // We assume this is floating point still!
         f32 * Samples = (f32*)BufferData;
         u32 SamplesPerSecond = GlobalAudio.WaveFormat->Format.nSamplesPerSec;
+        #if 1
+        Win32_OutputTestSound(SampleCount, Samples, 0.2f);
+        #else
         Win32_OutputSineWave(SamplesPerSecond, SampleCount, Samples, 440, 0.5);
+        #endif
 
         Result = GlobalAudio.RenderClient->lpVtbl->ReleaseBuffer(GlobalAudio.RenderClient, SampleCount, 0);
 
@@ -461,18 +465,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 {
 
 
-  bool InitializedAudio = Win32_InitAudio();
-  if (!InitializedAudio)
-  {
-    OutputDebugStringA("Failed to init Audio!\n");
-  }
-  // Run a separate thread for audio
-  //GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
-  // SetThreadPriority(GlobalAudioThread.Handle, THREAD_PRIORITY_TIME_CRITICAL);
-  if (GlobalAudioThread.Handle == 0)
-  {
-    OutputDebugStringA("Failed to create audio thread!\n");
-  }
+
 
   const char* WindowClassName = "Window Class";
 
@@ -515,14 +508,27 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
 
 
-  #if 0
+  #if 1
   u8 * SoundBuffer = 0;
   u32 SoundBufferSize = 0;
   bool SoundResult = Win32_ReadFile(&GameArena, "../assets/UpdatedFOTTER.wav", &SoundBuffer, &SoundBufferSize);
   sound Sound = {};
   Sound_ParseWave(&GameArena, &Sound, SoundBuffer, SoundBufferSize);
+  GlobalSound = Sound;
   #endif
 
+  bool InitializedAudio = Win32_InitAudio();
+  if (!InitializedAudio)
+  {
+    OutputDebugStringA("Failed to init Audio!\n");
+  }
+  // Run a separate thread for audio
+  GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
+  SetThreadPriority(GlobalAudioThread.Handle, THREAD_PRIORITY_TIME_CRITICAL);
+  if (GlobalAudioThread.Handle == 0)
+  {
+    OutputDebugStringA("Failed to create audio thread!\n");
+  }
 
   win32_game_code GameCode = {};
   Win32_LoadGameCode(&GameCode);
