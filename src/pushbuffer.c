@@ -55,20 +55,19 @@ void Pushbuffer_PushRectColor(pushbuffer* Pushbuffer, vec2f Origin, vec2f XAxis,
   Pushbuffer_Write(Pushbuffer, Pushbuffer_Entry_Rect_Color, pushbuffer_entry_type);
   Pushbuffer_Write(Pushbuffer, Entry, pushbuffer_entry_rect_color);
 }
-void Pushbuffer_PushRectTexture(pushbuffer* Pushbuffer, u32 *Memory, vec2i Min, vec2i Max, bool FlippedZ)
+void Pushbuffer_PushRectTexture(pushbuffer* Pushbuffer, texture * Texture, vec2f Origin, vec2f XAxis, vec2f YAxis, bool FlippedZ)
 {
 
   Pushbuffer_CheckSpace(Pushbuffer, sizeof(pushbuffer_entry_rect_texture));
   pushbuffer_entry_rect_texture Entry = {};
-  Entry.Memory = Memory;
-  Entry.Min = Min;
-  Entry.Max = Max;
+
+  Entry.Texture = Texture;
+  Entry.Origin = Origin;
+  Entry.XAxis = XAxis;
+  Entry.YAxis = YAxis;
   Entry.FlippedZ = FlippedZ;
   Pushbuffer_Write(Pushbuffer, Pushbuffer_Entry_Rect_Texture, pushbuffer_entry_type);
   Pushbuffer_Write(Pushbuffer, Entry, pushbuffer_entry_rect_texture);
-
-  u32 Width = Max.X - Min.X;
-  u32 Height = Max.Y - Min.Y;
 }
 
 void Pushbuffer_PushClear(pushbuffer* Pushbuffer, u32 Color)

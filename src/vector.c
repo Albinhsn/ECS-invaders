@@ -19,6 +19,13 @@ vec2f Vec2f_Add(vec2f A, vec2f B){
 
   return Result;
 }
+vec2f Vec2f_Sub(vec2f A, vec2f B){
+  vec2f Result = {};
+  Result.X = A.X - B.X;
+  Result.Y = A.Y - B.Y;
+
+  return Result;
+}
 
 f32 Vec2f_Length(vec2f A){
   return sqrtf(A.X * A.X + A.Y * A.Y);

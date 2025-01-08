@@ -99,6 +99,7 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
   query_result Query = EntityManager_Query(&GameState->EntityManager, POSITION_MASK | RENDER_MASK);
   for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
+    #if 0
     entity              Entity   = Query.Ids[QueryIndex];
 
     position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
@@ -106,7 +107,9 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
 
     vec2i               Min      = V2i((s32)(Position->X - Render->Texture->Width * 0.5f), (s32)(Position->Y - Render->Texture->Height * 0.5f));
     vec2i               Max      = V2i((s32)(Position->X + Render->Texture->Width * 0.5f), (s32)(Position->Y + Render->Texture->Height * 0.5f));
+
     Pushbuffer_PushRectTexture(Pushbuffer, Render->Texture->Memory, Min, Max, Render->FlippedZ);
+    #endif
   }
 }
 
@@ -471,18 +474,25 @@ GAME_UPDATE(GameUpdate)
   vec2f Origin  = {};
   Origin.X = GameState->ScreenWidth * 0.5f;
   Origin.Y = GameState->ScreenHeight * 0.5f;
+
+  f32 Scale = 5.0f;
   vec2f XAxis  = {};
   XAxis.X = 50 * cosf(T);
   XAxis.Y = 50 * sinf(T);
-  XAxis = Vec2f_Scale(XAxis, cosf(T));
-  XAxis = Vec2f_Add(XAxis, V2f(1,1));
+
   vec2f YAxis   = {};
   YAxis.X = 50 * cosf(T + PI / 2);
   YAxis.Y = 50 * sinf(T + PI / 2);
-  YAxis = Vec2f_Scale(YAxis, cosf(T));
-  YAxis = Vec2f_Add(YAxis, V2f(1,1));
 
+  #if 0
+  XAxis = Vec2f_Scale(XAxis, cosf(T) * Scale);
+  XAxis = Vec2f_Add(XAxis, V2f(Scale,Scale));
+  YAxis = Vec2f_Scale(YAxis, cosf(T) * Scale);
+  YAxis = Vec2f_Add(YAxis, V2f(Scale,Scale));
+  #endif
 
-  Pushbuffer_PushRectColor(Pushbuffer, Origin, XAxis, YAxis, 0xFFFF0000);
+  const char * Name = "spaceShips2";
+  texture * Texture = GetTextureByName(GameState, (u8*)Name);
+  Pushbuffer_PushRectTexture(Pushbuffer, Texture, Origin, XAxis, YAxis, 0xFFFF0000);
   #endif
 }

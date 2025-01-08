@@ -37,19 +37,8 @@ The ECS way is to create systems or components to solve things
 * Make enemies shoot as well
     * Both you and this can have a cd and just check it?
 * Make the actual drawings we do be targeting a bitmap not always the actual framebuffer
-* Make the rect and texture take and X and Y axis
-
-* Look at Handmade Hero for rendering scaled/rotated rectangles and texture mapping
-    * We need send a basis
-      * I.e we send a origin, x/y axis (x/y axis include the width/height)
-    * Then just use the dot product to figure out if the pixel is inside on each of the 4 edges
-        * Do this with just a rectangle first
-    * Then we just need to get the UV coordinates and do a bilinear sample
-        * How does this work with scaling?
-            * You base it of the width of your drawing, not the image width
-
 * Audio
-    * Write a WAV parser
+    * Finish the WAV parser
     * Figure out how we want to send sound from game <-> platform
         * Commands?
         * Different buffer?
