@@ -30,7 +30,6 @@ typedef struct pushbuffer_entry_rect_color
   vec2f XAxis;
   vec2f YAxis;
   vec2f Origin;
-  vec2i Min, Max;
   u32   Color;
 } pushbuffer_entry_rect_color;
 

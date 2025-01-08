@@ -21,7 +21,7 @@ typedef double   f64;
 #define false             0
 
 #define bool              u32
-#define PI 3.141592653589793
+#define PI 3.141592653589793f
 
 #define Kilobyte(size)    (size * 1024LL)
 #define Megabyte(size)    (Kilobyte(size) * 1024LL)
@@ -52,10 +52,7 @@ void String_Create(arena* Arena, string* String, u8* Buffer, u32 Length)
 }
 
 
-f32 Abs(f32 x)
-{
-  return x < 0 ? -x : x;
-}
+
 
 typedef struct texture texture;
 struct texture

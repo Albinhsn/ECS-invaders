@@ -1,5 +1,7 @@
 #include "renderer_software.h"
 #include "pushbuffer.c"
+#include "vector.c"
+#include "math.h"
 
 void Software_Renderer_Create(software_renderer* Renderer, void* Buffer, u16 ScreenWidth, u16 ScreenHeight)
 {
@@ -37,23 +39,73 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
       s32                         Height = Renderer->Height;
       pushbuffer_entry_rect_color Entry  = Pushbuffer_Read(Pushbuffer, pushbuffer_entry_rect_color);
 
-      u32                         MinX   = Entry.Min.X < 0 ? 0 : Entry.Min.X;
-      u32                         MinY   = Entry.Min.Y < 0 ? 0 : Entry.Min.Y;
 
-      u32                         MaxX   = Entry.Max.X > Width ? Width : Entry.Max.X;
-      u32                         MaxY   = Entry.Max.Y > Height ? Height : Entry.Max.Y;
+      vec2f v0  = Entry.Origin;
+      vec2f v1  = Vec2f_Add(Entry.Origin, Entry.XAxis);
+      vec2f v2  = Vec2f_Add(Entry.Origin, Entry.YAxis);
+      vec2f v3  = Vec2f_Add(v2, Entry.XAxis);
+
+      s32 MinX =  10000;
+      s32 MaxX = -10000;
+      s32 MinY =  10000;
+      s32 MaxY = -10000;
+
+      vec2f Corners[4] = {v0, v1, v2, v3};
+      for(u32 CornerIndex = 0; CornerIndex < ArrayCount(Corners); CornerIndex++)
+      {
+        vec2f Corner = Corners[CornerIndex];
+        MinX = (s32)Min(Corner.X, (f32)MinX);
+        MaxX = (s32)Max(Corner.X, (f32)MaxX);
+        MinY = (s32)Min(Corner.Y, (f32)MinY);
+        MaxY = (s32)Max(Corner.Y, (f32)MaxY);
+      }
+
+      MinX = MaxI(MinX, 0);
+      MaxX = MinI(MaxX, Width - 1);
+      MinY = MaxI(MinY, 0);
+      MaxY = MinI(MaxY, Height - 1);
+
 
       u32*                        Buffer = Renderer->Buffer;
 
       u32                         Color  = Entry.Color;
-      for (u32 Y = MinY; Y < MaxY; Y++)
+
+      vec2f XAxis = Entry.XAxis;
+      vec2f YAxis = Entry.YAxis;
+      f32 XAxisLength = Vec2f_Length(XAxis);
+      XAxisLength *= XAxisLength;
+      f32 YAxisLength = Vec2f_Length(YAxis);
+      YAxisLength *= YAxisLength;
+      vec2f Origin = Entry.Origin;
+      for (s32 Y = MinY; Y < MaxY; Y++)
       {
-        for (u32 X = MinX; X < MaxX; X++)
+        for (s32 X = MinX; X < MaxX; X++)
         {
-          *(Buffer + Y * Width + X) = Color;
+          f32 XEdge = Vec2f_Dot(V2f((f32)X - Origin.X,(f32)Y - Origin.Y), XAxis);
+          f32 YEdge = Vec2f_Dot(V2f((f32)X - Origin.X,(f32)Y - Origin.Y), YAxis);
+
+          bool WithinX = XEdge >= 0 && XEdge < XAxisLength;
+          bool WithinY = YEdge >= 0 && YEdge < YAxisLength;
+          if(WithinX && WithinY){
+            *(Buffer + Y * Width + X) = Color;
+          }
+          else{
+              *(Buffer + Y * Width + X) = 0x000000FF;
+          }
+          if(Abs(Y - v0.Y) < 5 && Abs(X - v0.X) < 5){
+              *(Buffer + Y * Width + X) = 0x0000FF00;
+          }
+          if(Abs(Y - v1.Y) < 5 && Abs(X - v1.X) < 5){
+            *(Buffer + Y * Width + X) = 0x0000FF00;
+          }
+          if(Abs(Y - v2.Y) < 5 && Abs(X - v2.X) < 5){
+            *(Buffer + Y * Width + X) = 0x0000FF00;
+          }
+          if(Abs(Y - v3.Y) < 5 && Abs(X - v3.X) < 5){
+            *(Buffer + Y * Width + X) = 0x0000FF00;
+          }
         }
       }
-
       break;
     }
     case Pushbuffer_Entry_Rect_Texture:

@@ -515,11 +515,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
 
 
+  #if 0
   u8 * SoundBuffer = 0;
   u32 SoundBufferSize = 0;
   bool SoundResult = Win32_ReadFile(&GameArena, "../assets/UpdatedFOTTER.wav", &SoundBuffer, &SoundBufferSize);
   sound Sound = {};
   Sound_ParseWave(&GameArena, &Sound, SoundBuffer, SoundBufferSize);
+  #endif
 
 
   win32_game_code GameCode = {};

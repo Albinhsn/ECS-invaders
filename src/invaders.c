@@ -95,6 +95,7 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
 
 void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
 {
+  Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
   query_result Query = EntityManager_Query(&GameState->EntityManager, POSITION_MASK | RENDER_MASK);
   for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
@@ -105,7 +106,7 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
 
     vec2i               Min      = V2i((s32)(Position->X - Render->Texture->Width * 0.5f), (s32)(Position->Y - Render->Texture->Height * 0.5f));
     vec2i               Max      = V2i((s32)(Position->X + Render->Texture->Width * 0.5f), (s32)(Position->Y + Render->Texture->Height * 0.5f));
-    Pushbuffer_Push_Rect_Texture(Pushbuffer, Render->Texture->Memory, Min, Max, Render->FlippedZ);
+    Pushbuffer_PushRectTexture(Pushbuffer, Render->Texture->Memory, Min, Max, Render->FlippedZ);
   }
 }
 
@@ -417,7 +418,7 @@ void CleanupEntities(game_state* GameState)
 
 GAME_UPDATE(GameUpdate)
 {
-  Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
+
   game_state* GameState = (game_state*)Memory->PermanentStorage;
   Assert(GameState->CommandBuffer.Time >= 0);
   GameState->DeltaTime  = Memory->DeltaTime;
@@ -449,6 +450,7 @@ GAME_UPDATE(GameUpdate)
   // Omega slow :)
   // Arena_Clear(&GameState->TemporaryArena);
 
+  #if 0
   UseInput(GameState, Input);
   ExecuteNewCommands(GameState);
   UpdatePhysics(GameState);
@@ -460,4 +462,27 @@ GAME_UPDATE(GameUpdate)
   {
     Assert(GameState->CommandBuffer.Time >= 0);
   }
+  #else
+  Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
+  // Draw a quad in the middle of the screen
+
+  GameState->CommandBuffer.Time +=GameState->DeltaTime;
+  f32 T = GameState->CommandBuffer.Time;
+  vec2f Origin  = {};
+  Origin.X = GameState->ScreenWidth * 0.5f;
+  Origin.Y = GameState->ScreenHeight * 0.5f;
+  vec2f XAxis  = {};
+  XAxis.X = 50 * cosf(T);
+  XAxis.Y = 50 * sinf(T);
+  XAxis = Vec2f_Scale(XAxis, cosf(T));
+  XAxis = Vec2f_Add(XAxis, V2f(1,1));
+  vec2f YAxis   = {};
+  YAxis.X = 50 * cosf(T + PI / 2);
+  YAxis.Y = 50 * sinf(T + PI / 2);
+  YAxis = Vec2f_Scale(YAxis, cosf(T));
+  YAxis = Vec2f_Add(YAxis, V2f(1,1));
+
+
+  Pushbuffer_PushRectColor(Pushbuffer, Origin, XAxis, YAxis, 0xFFFF0000);
+  #endif
 }

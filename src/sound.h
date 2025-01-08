@@ -9,7 +9,7 @@ typedef struct sound
   u32 ByteRate;
   u32 BlockAlign;
   u32 BitsPerSample;
-  u16 * Samples;
+  void * Samples;
   u16 SampleCount;
 } sound;
 
