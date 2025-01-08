@@ -5,6 +5,7 @@
 #include "image.c"
 #include "renderer_software.c"
 #include "win32_platform.h"
+#include "sound.c"
 
 static u16                     GlobalScreenWidth  = 600;
 static u16                     GlobalScreenHeight = 800;
@@ -312,7 +313,7 @@ bool Win32_InitAudio()
     OutputDebugStringA("Failed to initialize audio client\n");
     return false;
   }
-  
+
 
 
   Result = GlobalAudio.AudioClient->lpVtbl->GetService(GlobalAudio.AudioClient, &IID_IAudioRenderClient, (void**)&GlobalAudio.RenderClient);
@@ -384,7 +385,7 @@ bool Win32_InitAudio()
 void Win32_OutputSineWave(u32 SamplesPerSecond, u32 SampleCount, f32 * Samples, f32 ToneHz, f32 ToneVolume)
 {
   static f64 TSine = 0;
-  
+
   f32 WavePeriod = SamplesPerSecond / ToneHz;
 
   for(u32 SampleIndex = 0; SampleIndex < SampleCount; SampleIndex++)
@@ -412,7 +413,7 @@ DWORD Win32_AudioThread_Main(void* Data)
   while (true)
   {
     DWORD GotEvent = WaitForSingleObject(GlobalAudio.RefillEvent, INFINITE);
-  
+
     // Wait for event
     if (GotEvent == WAIT_OBJECT_0)
     {
@@ -459,14 +460,15 @@ void Win32_UninitAudio()
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
 
+
   bool InitializedAudio = Win32_InitAudio();
   if (!InitializedAudio)
   {
     OutputDebugStringA("Failed to init Audio!\n");
   }
   // Run a separate thread for audio
-  GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
-  SetThreadPriority(GlobalAudioThread.Handle, THREAD_PRIORITY_TIME_CRITICAL);
+  //GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
+  // SetThreadPriority(GlobalAudioThread.Handle, THREAD_PRIORITY_TIME_CRITICAL);
   if (GlobalAudioThread.Handle == 0)
   {
     OutputDebugStringA("Failed to create audio thread!\n");
@@ -511,6 +513,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   LARGE_INTEGER PerfCountFrequencyResult;
   QueryPerformanceFrequency(&PerfCountFrequencyResult);
   GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
+
+
+  u8 * SoundBuffer = 0;
+  u32 SoundBufferSize = 0;
+  bool SoundResult = Win32_ReadFile(&GameArena, "../assets/UpdatedFOTTER.wav", &SoundBuffer, &SoundBufferSize);
+  sound Sound = {};
+  Sound_ParseWave(&GameArena, &Sound, SoundBuffer, SoundBufferSize);
+
 
   win32_game_code GameCode = {};
   Win32_LoadGameCode(&GameCode);

@@ -51,6 +51,7 @@ void String_Create(arena* Arena, string* String, u8* Buffer, u32 Length)
 {
 }
 
+
 f32 Abs(f32 x)
 {
   return x < 0 ? -x : x;

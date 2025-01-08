@@ -1,7 +1,7 @@
 @echo off
 
 set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHa- -O0 -Oi -WX -W4 -wd4127 -wd4505 -wd4456 -wd4201 -wd4100 -wd4189 -FC -Z7
-set CommonLinkerFlags= -opt:ref user32.lib gdi32.lib winmm.lib ole32.lib winmm.lib 
+set CommonLinkerFlags= -opt:ref user32.lib gdi32.lib winmm.lib ole32.lib winmm.lib Ws2_32.lib
 
 IF NOT EXIST .\build mkdir .\build
 pushd .\build
