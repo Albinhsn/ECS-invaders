@@ -238,9 +238,11 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
             // Figure out the uv coordinates
 
             f32 U = XEdge / XAxisLength;
-            f32 V = YEdge / YAxisLength;
+            f32 V = 1 - YEdge / YAxisLength; // Why?
             Assert(U >= 0 && U <= 1);
             Assert(V >= 0 && V <= 1);
+            V = Entry.FlippedZ ? 1 - V : V;
+
 
             u32 Sample = Software_Renderer_SampleTextureBilinear(Entry.Texture, U, V);
             u32 CurrentPixel = *(Buffer + Y * Width + X);

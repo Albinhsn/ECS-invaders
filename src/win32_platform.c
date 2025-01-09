@@ -434,10 +434,12 @@ DWORD Win32_AudioThread_Main(void* Data)
         // We assume this is floating point still!
         f32 * Samples = (f32*)BufferData;
         u32 SamplesPerSecond = GlobalAudio.WaveFormat->Format.nSamplesPerSec;
-        #if 1
+        #if 0
         Win32_OutputTestSound(SampleCount, Samples, 0.2f);
-        #else
+        #elif 0
         Win32_OutputSineWave(SamplesPerSecond, SampleCount, Samples, 440, 0.5);
+        #else
+
         #endif
 
         Result = GlobalAudio.RenderClient->lpVtbl->ReleaseBuffer(GlobalAudio.RenderClient, SampleCount, 0);
@@ -508,6 +510,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
 
 
+  #if 0
   #if 1
   u8 * SoundBuffer = 0;
   u32 SoundBufferSize = 0;
@@ -522,13 +525,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   {
     OutputDebugStringA("Failed to init Audio!\n");
   }
+
   // Run a separate thread for audio
   GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
   SetThreadPriority(GlobalAudioThread.Handle, THREAD_PRIORITY_TIME_CRITICAL);
+
   if (GlobalAudioThread.Handle == 0)
   {
     OutputDebugStringA("Failed to create audio thread!\n");
   }
+  #endif
 
   win32_game_code GameCode = {};
   Win32_LoadGameCode(&GameCode);
@@ -600,7 +606,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   {
     OutputDebugStringA("Failed to kill thread? GL\n");
   }
-  Win32_UninitAudio();
+  // Win32_UninitAudio();
 
   return 0;
 }

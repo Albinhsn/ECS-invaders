@@ -31,14 +31,14 @@ The ECS way is to create systems or components to solve things
 
 
 # ToDo
+* Test If the new renderer works outside of screen etc
+
 * Get a handle of the timer stuff in win32
 * Fix dt bug?
 * Make like a TypeComponent or smth
 * Make enemies shoot as well
     * Both you and this can have a cd and just check it?
-* Make the actual drawings we do be targeting a bitmap not always the actual framebuffer
 * Audio
-    * Finish the WAV parser
     * Figure out how we want to send sound from game <-> platform
         * Commands?
         * Different buffer?
@@ -48,6 +48,8 @@ The ECS way is to create systems or components to solve things
             * Just store an Array of sounds that are currently playing
         * Do it in 32-bit float :)
     * Sound Mixer
+
+* SDF Font Rendering
 
 * UI
     * IM Layout library

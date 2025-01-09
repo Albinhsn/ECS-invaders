@@ -99,17 +99,17 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
   query_result Query = EntityManager_Query(&GameState->EntityManager, POSITION_MASK | RENDER_MASK);
   for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
-    #if 0
+
     entity              Entity   = Query.Ids[QueryIndex];
 
     position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
     render_component*   Render   = (render_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, RENDER_ID);
 
-    vec2i               Min      = V2i((s32)(Position->X - Render->Texture->Width * 0.5f), (s32)(Position->Y - Render->Texture->Height * 0.5f));
-    vec2i               Max      = V2i((s32)(Position->X + Render->Texture->Width * 0.5f), (s32)(Position->Y + Render->Texture->Height * 0.5f));
+    vec2f Origin = V2f(Position->X - Render->Texture->Width * 0.5f, Position->Y + Render->Texture->Height * 0.5f);
+    vec2f XAxis = V2f((f32)Render->Texture->Width, 0);
+    vec2f YAxis = V2f(0, -(f32)Render->Texture->Height);
+    Pushbuffer_PushRectTexture(Pushbuffer, Render->Texture, Origin,  XAxis, YAxis, Render->FlippedZ);
 
-    Pushbuffer_PushRectTexture(Pushbuffer, Render->Texture->Memory, Min, Max, Render->FlippedZ);
-    #endif
   }
 }
 
@@ -367,7 +367,7 @@ void CommandBuffer_PushDecideSpawn(command_buffer* Buffer, f32 Time, u32 Enemies
   command Command = {};
   Command.Time    = Time;
   Command.Type    = Command_DecideSpawn;
-  Command.EnemiesToSpawn = EnemiesToSpawn;
+  Command.EnemiesToSpawn = 0; EnemiesToSpawn;
   CommandBuffer_PushCommand(Buffer, Command);
 }
 void ExecuteNewCommands(game_state* GameState)
@@ -453,7 +453,7 @@ GAME_UPDATE(GameUpdate)
   // Omega slow :)
   // Arena_Clear(&GameState->TemporaryArena);
 
-  #if 0
+
   UseInput(GameState, Input);
   ExecuteNewCommands(GameState);
   UpdatePhysics(GameState);
@@ -465,34 +465,9 @@ GAME_UPDATE(GameUpdate)
   {
     Assert(GameState->CommandBuffer.Time >= 0);
   }
-  #else
-  Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
+
   // Draw a quad in the middle of the screen
 
-  GameState->CommandBuffer.Time +=GameState->DeltaTime;
-  f32 T = GameState->CommandBuffer.Time;
-  vec2f Origin  = {};
-  Origin.X = GameState->ScreenWidth * 0.5f;
-  Origin.Y = GameState->ScreenHeight * 0.5f;
 
-  f32 Scale = 5.0f;
-  vec2f XAxis  = {};
-  XAxis.X = 50 * cosf(T);
-  XAxis.Y = 50 * sinf(T);
 
-  vec2f YAxis   = {};
-  YAxis.X = 50 * cosf(T + PI / 2);
-  YAxis.Y = 50 * sinf(T + PI / 2);
-
-  #if 0
-  XAxis = Vec2f_Scale(XAxis, cosf(T) * Scale);
-  XAxis = Vec2f_Add(XAxis, V2f(Scale,Scale));
-  YAxis = Vec2f_Scale(YAxis, cosf(T) * Scale);
-  YAxis = Vec2f_Add(YAxis, V2f(Scale,Scale));
-  #endif
-
-  const char * Name = "spaceShips2";
-  texture * Texture = GetTextureByName(GameState, (u8*)Name);
-  Pushbuffer_PushRectTexture(Pushbuffer, Texture, Origin, XAxis, YAxis, 0xFFFF0000);
-  #endif
 }
