@@ -14,10 +14,12 @@ void Software_Renderer_Clear(software_renderer* Renderer, u32 Color)
 {
 
   u64 BufferSize = Renderer->Width * Renderer->Height;
+
   for (s32 i = 0; i < BufferSize; i++)
   {
     Renderer->Buffer[i] = Color;
   }
+
 }
 
 u32 Software_Renderer_SampleTextureBilinear(texture * Texture, f32 U, f32 V)
@@ -223,9 +225,9 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
       f32 YAxisLength = Vec2f_Length(YAxis);
       YAxisLength *= YAxisLength;
       vec2f Origin = Entry.Origin;
-      for (s32 Y = MinY; Y < MaxY; Y++)
+      for (s32 Y = MinY; Y <= MaxY; Y++)
       {
-        for (s32 X = MinX; X < MaxX; X++)
+        for (s32 X = MinX; X <= MaxX; X++)
         {
           vec2f Position = V2f((f32)X,(f32)Y);
           vec2f OriginToPoint = Vec2f_Sub(Position, Origin);
@@ -235,10 +237,10 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
           bool WithinX = XEdge >= 0 && XEdge <= XAxisLength;
           bool WithinY = YEdge >= 0 && YEdge <= YAxisLength;
           if(WithinX && WithinY){
-            // Figure out the uv coordinates
 
+            // Figure out the uv coordinates
             f32 U = XEdge / XAxisLength;
-            f32 V = 1 - YEdge / YAxisLength; // Why?
+            f32 V = 1 - YEdge / YAxisLength; // Since Y is down!
             Assert(U >= 0 && U <= 1);
             Assert(V >= 0 && V <= 1);
             V = Entry.FlippedZ ? 1 - V : V;

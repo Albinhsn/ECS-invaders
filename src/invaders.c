@@ -105,9 +105,22 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
     position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
     render_component*   Render   = (render_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, RENDER_ID);
 
+    // Is the bottom left corner!
     vec2f Origin = V2f(Position->X - Render->Texture->Width * 0.5f, Position->Y + Render->Texture->Height * 0.5f);
+    vec2f XAxis = {};
+    XAxis.X = cosf(Position->Rotation);
+    XAxis.Y = sinf(Position->Rotation);
+    XAxis = Vec2f_Scale(XAxis, (f32)Render->Texture->Width);
+
+    vec2f YAxis = {};
+    YAxis.X = cosf(Position->Rotation + PI / 2);
+    YAxis.Y = sinf(Position->Rotation + PI / 2);
+
+    YAxis = Vec2f_Scale(YAxis, -(f32)Render->Texture->Height);
+    #if 0
     vec2f XAxis = V2f((f32)Render->Texture->Width, 0);
     vec2f YAxis = V2f(0, -(f32)Render->Texture->Height);
+    #endif
     Pushbuffer_PushRectTexture(Pushbuffer, Render->Texture, Origin,  XAxis, YAxis, Render->FlippedZ);
 
   }
@@ -124,7 +137,7 @@ void CreatePlayer(game_state* GameState)
   position_component Position          = {};
   Position.X                           = 200;
   Position.Y                           = 550;
-  Position.Rotation                    = PI / 2;
+  Position.Rotation                    = 0;
   velocity_component Velocity          = {};
   render_component   Render            = {};
   const char*        PlayerTextureName = "spaceShips1";
@@ -205,9 +218,24 @@ void UpdatePhysics(game_state* GameState)
     position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
     velocity_component* Velocity = (velocity_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, VELOCITY_ID);
 
-    f32 Angle = cosf(Position->Rotation);
-    Position->X += Velocity->X * GameState->DeltaTime;
-    Position->Y += Velocity->Y * GameState->DeltaTime;
+
+
+    // Calculate the X and Y axis given this rotation
+    vec2f XAxis = {};
+    XAxis.X = cosf(Position->Rotation);
+    XAxis.Y = sinf(Position->Rotation);
+    vec2f YAxis = {};
+    YAxis.X = cosf(Position->Rotation + PI / 2);
+    YAxis.Y = sinf(Position->Rotation + PI / 2);
+
+    vec2f Pos = V2f(Position->X, Position->Y);
+    vec2f dx  = Vec2f_Scale(XAxis, Velocity->X * GameState->DeltaTime);
+    Pos       = Vec2f_Add(dx, Pos);
+    vec2f dy  = Vec2f_Scale(YAxis, Velocity->Y * GameState->DeltaTime);
+    Pos       = Vec2f_Add(dy, Pos);
+
+    Position->X  = Pos.X;
+    Position->Y = Pos.Y;
   }
 }
 
@@ -384,7 +412,7 @@ position_component GetRandomEnemySpawnPosition(game_state* GameState)
   Result.X                  = rand() / (f32)RAND_MAX * GameState->ScreenWidth;
   Result.Y                  = rand() / (f32)RAND_MAX * GameState->ScreenHeight * -0.25f - GameState->ScreenHeight * 0.2f;
 
-  Result.Rotation           = (rand() / (f32)RAND_MAX + 1) * PI / 2;
+  Result.Rotation           = (rand() / (f32)RAND_MAX * PI);
 
   return Result;
 }

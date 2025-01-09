@@ -89,7 +89,8 @@ void Win32_RenderFramebuffer(HWND hwnd)
 
   HDC               hdc      = GetDC(hwnd);
   software_renderer Renderer = GlobalRenderer.Renderer;
-  StretchDIBits(hdc, 0, 0, GlobalScreenWidth, GlobalScreenHeight, 0, 0, Renderer.Width, Renderer.Height, Renderer.Buffer, &GlobalRenderer.Info, DIB_RGB_COLORS, SRCCOPY);
+
+  StretchDIBits(hdc, 0, 0, GlobalScreenWidth, GlobalScreenHeight, 0, 0, GlobalScreenWidth, GlobalScreenHeight, Renderer.Buffer, &GlobalRenderer.Info, DIB_RGB_COLORS, SRCCOPY);
   ReleaseDC(hwnd, hdc);
 }
 
@@ -479,16 +480,25 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   RegisterClass(&wc);
 
+
+  // Calculate the client area
+  RECT rect = {0, 0, GlobalScreenWidth, GlobalScreenHeight};
+  AdjustWindowRect(&rect, WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME, false);
+
+  u32 WindowWidth = rect.right - rect.left;
+  u32 WindowHeight = rect.bottom - rect.top;
+
   HWND hwnd = CreateWindowEx(0,                                                                   // Optional window styles
                              WindowClassName,                                                     // Window class
                              "Window Text",                                                       // Window text
                              WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME,                                 // Window style, last part removes resizing
-                             CW_USEDEFAULT, CW_USEDEFAULT, GlobalScreenWidth, GlobalScreenHeight, // Size and position
+                             CW_USEDEFAULT, CW_USEDEFAULT, WindowWidth, WindowHeight, // Size and position
                              NULL,                                                                // Parent Window
                              NULL,                                                                // Menu
                              hInstance,                                                           // Instance handle
                              NULL                                                                 // Additional application data
   );
+
 
   if (hwnd == NULL)
   {
