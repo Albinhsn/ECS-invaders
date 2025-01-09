@@ -95,7 +95,7 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
 
 void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
 {
-  Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
+
   query_result Query = EntityManager_Query(&GameState->EntityManager, POSITION_MASK | RENDER_MASK);
   for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
@@ -117,10 +117,6 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
     YAxis.Y = sinf(Position->Rotation + PI / 2);
 
     YAxis = Vec2f_Scale(YAxis, -(f32)Render->Texture->Height);
-    #if 0
-    vec2f XAxis = V2f((f32)Render->Texture->Width, 0);
-    vec2f YAxis = V2f(0, -(f32)Render->Texture->Height);
-    #endif
     Pushbuffer_PushRectTexture(Pushbuffer, Render->Texture, Origin,  XAxis, YAxis, Render->FlippedZ);
 
   }
@@ -266,7 +262,7 @@ bool IsColliding(type_component * T0, collider_component* C0, position_component
   return CanCollide && Collision_Rect_Rect(C0->Extents, V2f(P0->X, P0->Y), C1->Extents, V2f(P1->X, P1->Y));
 }
 
-void CollisionDetection(game_state* GameState)
+void CollisionDetection(game_state* GameState, pushbuffer * Pushbuffer)
 {
   query_result Query = EntityManager_Query(&GameState->EntityManager, COLLIDER_MASK | POSITION_MASK | TYPE_MASK);
   for (u32 First = 0; First < Query.Count - 1; First++)
@@ -300,7 +296,7 @@ void CollisionDetection(game_state* GameState)
     }
   }
 
-  for (u32 QueryIndex = 0; QueryIndex < Query.Count - 1; QueryIndex++)
+  for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
     entity              Entity   = Query.Ids[QueryIndex];
     collider_component* Collider = (collider_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, COLLIDER_ID);
@@ -337,9 +333,59 @@ void CollisionDetection(game_state* GameState)
     }
     else if(Type->Type == EntityType_Enemy)
     {
+      // Get the BB of the enemy
+      vec2f XAxis = {};
+      XAxis.X = cosf(Position->Rotation);
+      XAxis.Y = sinf(Position->Rotation);
+      vec2f YAxis = {};
+      YAxis.X = cosf(Position->Rotation + PI / 2);
+      YAxis.Y = sinf(Position->Rotation + PI / 2);
+
+      XAxis = Vec2f_Scale(XAxis, Collider->Extents.X * 2);
+      YAxis = Vec2f_Scale(YAxis, -Collider->Extents.Y * 2);
+
+      #if 0
+      vec2f HalfXAxis = Vec2f_Scale(XAxis, 0.5f);
+      vec2f HalfYAxis = Vec2f_Scale(YAxis, 0.5f);
+      #endif
+
+      vec2f Pos = Vec2f_Sub(XAxis, Vec2f_Sub(YAxis, V2f(Position->X, Position->Y)));
+      vec2f v0 = Pos;
+      vec2f v1 = Vec2f_Add(v0, XAxis);
+      vec2f v2 = Vec2f_Add(v0, YAxis);
+      vec2f v3 = Vec2f_Add(v2, XAxis);
+      Pushbuffer_PushRectColor(Pushbuffer, Pos, XAxis, YAxis, 0x00FF0000);
+
+      f32 MinX =  10000;
+      f32 MaxX = -10000;
+      vec2f Corners[4] = {v0, v1, v2, v3};
+      for(u32 CornerIndex = 0; CornerIndex < ArrayCount(Corners); CornerIndex++)
+      {
+        vec2f Corner = Corners[CornerIndex];
+        MinX = Min(Corner.X, MinX);
+        MaxX = Max(Corner.X, MaxX);
+      }
+
+
       // Check if we're hitting the wall
+      if(MinX < 0)
+      {
+        vec2f Reflected = Vec2f_Reflect(YAxis, V2f(1,0));
+        f32 NewRotation = atan2f(Reflected.Y, Reflected.X) + PI / 2;
+        Position->Rotation = NewRotation;
+        Position->X = 0 + Abs(MaxX - MinX);
+      }
+      else if(MaxX >= GameState->ScreenWidth - 1)
+      {
+
+      }else
+      {
+
+      }
+      Assert(Position->X >= 0);
+
       // If so reflect the rotation
-      // Then clamp the position
+      // Then clamp the position af
     }
   }
 }
@@ -409,10 +455,10 @@ void RemoveOutOfBoundsUnits(game_state* GameState)
 position_component GetRandomEnemySpawnPosition(game_state* GameState)
 {
   position_component Result = {};
-  Result.X                  = rand() / (f32)RAND_MAX * GameState->ScreenWidth;
-  Result.Y                  = rand() / (f32)RAND_MAX * GameState->ScreenHeight * -0.25f - GameState->ScreenHeight * 0.2f;
+  Result.X                  = GameState->ScreenWidth * 0.5f;
+  Result.Y                  = rand() / (f32)RAND_MAX * GameState->ScreenHeight * 0.25f;
 
-  Result.Rotation           = (rand() / (f32)RAND_MAX * PI);
+  Result.Rotation           = (rand() / (f32)RAND_MAX * PI) - PI / 2;
 
   return Result;
 }
@@ -516,6 +562,7 @@ GAME_UPDATE(GameUpdate)
   game_state* GameState = (game_state*)Memory->PermanentStorage;
   Assert(GameState->CommandBuffer.Time >= 0);
   GameState->DeltaTime  = Memory->DeltaTime;
+  Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
   if (!Memory->IsInitialized)
   {
     // Initialize GameArena
@@ -549,7 +596,7 @@ GAME_UPDATE(GameUpdate)
   ExecuteNewCommands(GameState);
   UpdatePhysics(GameState);
 
-  CollisionDetection(GameState);
+  CollisionDetection(GameState, Pushbuffer);
   CleanupEntities(GameState);
 
   RenderObjects(GameState, Pushbuffer);

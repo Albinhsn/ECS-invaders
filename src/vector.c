@@ -3,6 +3,7 @@
 
 
 
+
 vec2f Vec2f_NormalizeSafe(vec2f Vector){
   float Magnitude = sqrtf(Vector.X * Vector.X + Vector.Y * Vector.Y);
   if(Magnitude != 0){
@@ -38,4 +39,12 @@ vec2f Vec2f_Scale(vec2f A, f32 Scale){
   A.X *= Scale;
   A.Y *= Scale;
   return A;
+}
+
+vec2f Vec2f_Reflect(vec2f V, vec2f Normal)
+{
+
+  // V - Normal * (2 * Dot(V, Normal))
+  return Vec2f_Sub(V, Vec2f_Scale(Normal, (2 * Vec2f_Dot(V, Normal))));;
+
 }

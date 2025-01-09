@@ -58,8 +58,6 @@ The ECS way is to create systems or components to solve things
     * IM Layout library
     * Render the layout
 
-* Particle system
-
 ----
 * CommandBuffer
     * SpawnEnemy
