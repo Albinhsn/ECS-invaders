@@ -116,7 +116,7 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
 void CreatePlayer(game_state* GameState)
 {
 
-  u32              Mask                = POSITION_MASK | HEALTH_MASK | RENDER_MASK | COLLIDER_MASK | VELOCITY_MASK;
+  u32              Mask                = POSITION_MASK | HEALTH_MASK | RENDER_MASK | COLLIDER_MASK | VELOCITY_MASK |TYPE_MASK;
   entity           Entity              = EntityManager_Create_Entity(&GameState->EntityManager, Mask);
 
   health_component Health              = {};
@@ -124,6 +124,7 @@ void CreatePlayer(game_state* GameState)
   position_component Position          = {};
   Position.X                           = 200;
   Position.Y                           = 550;
+  Position.Rotation                    = PI / 2;
   velocity_component Velocity          = {};
   render_component   Render            = {};
   const char*        PlayerTextureName = "spaceShips1";
@@ -132,9 +133,10 @@ void CreatePlayer(game_state* GameState)
   Render.FlippedZ                      = true;
   collider_component Collider          = {};
   Collider.Extents                     = V2f(Render.Texture->Width * 0.5f, Render.Texture->Height * 0.5f);
-  Collider.CanCollideWithMask          = ENEMY_MASK;
-  Collider.ColliderIsMask              = PLAYER_MASK;
-  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 5, &Health, &Position, &Velocity, &Render, &Collider);
+
+  type_component Type = {};
+  Type.Type = EntityType_Player;
+  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type);
   GameState->PlayerEntity = Entity;
 }
 
@@ -174,10 +176,10 @@ void UseInput(game_state* GameState, game_input* Input)
   // u32 Shoot;
   if (Input->Shoot)
   {
-    u32                BulletMask = RENDER_MASK | POSITION_MASK | VELOCITY_MASK | COLLIDER_MASK;
+    u32                BulletMask = RENDER_MASK | POSITION_MASK | VELOCITY_MASK | COLLIDER_MASK | TYPE_MASK;
     entity             Bullet     = EntityManager_Create_Entity(&GameState->EntityManager, BulletMask);
     position_component Position   = *PlayerPosition;
-    Position.Y += 40.0f;
+    Position.Y -= 40.0f;
     render_component Render     = {};
     Render.Alpha                = 1.0f;
     const char* TextureName     = "spaceMissiles2";
@@ -186,15 +188,15 @@ void UseInput(game_state* GameState, game_input* Input)
     velocity_component Velocity = {};
     Velocity.Y                  = -200.0f;
     collider_component Collider = {};
-    Collider.ColliderIsMask     = PLAYER_BULLET_MASK;
-    Collider.CanCollideWithMask = ENEMY_MASK;
-    EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 4, &Position, &Velocity, &Render, &Collider);
+
+    type_component Type = {};
+    Type.Type = EntityType_Bullet_Player;
+    EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 5, &Position, &Velocity, &Render, &Collider, &Type);
   }
 }
 
 void UpdatePhysics(game_state* GameState)
 {
-
   query_result Query = EntityManager_Query(&GameState->EntityManager, VELOCITY_MASK | POSITION_MASK);
   for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
@@ -203,6 +205,7 @@ void UpdatePhysics(game_state* GameState)
     position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
     velocity_component* Velocity = (velocity_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, VELOCITY_ID);
 
+    f32 Angle = cosf(Position->Rotation);
     Position->X += Velocity->X * GameState->DeltaTime;
     Position->Y += Velocity->Y * GameState->DeltaTime;
   }
@@ -213,22 +216,37 @@ bool Collision_Rect_Rect(vec2f e0, vec2f p0, vec2f e1, vec2f p1)
   return Abs(p0.X - p1.X) < e0.X + e1.X && //
          Abs(p0.Y - p1.Y) < e0.Y + e1.Y;   //
 }
-
-bool IsColliding(collider_component* C0, position_component* P0, collider_component* C1, position_component* P1)
+bool Collision_OBB_OBB(f32 r0, vec2f e0, vec2f p0, f32 r1, vec2f e1, vec2f p1)
 {
-  bool CanCollide = (C0->CanCollideWithMask & C1->ColliderIsMask) > 0;
+  return false;
+}
 
+bool IsColliding(type_component * T0, collider_component* C0, position_component* P0, type_component * T1, collider_component* C1, position_component* P1)
+{
+  bool CanCollide = true;
+  if(T0->Type == T1->Type){
+    CanCollide = false;
+  }
+  else if(T0->Type == EntityType_Player && T1->Type == EntityType_Bullet_Player){
+    CanCollide = false;
+  }
+  else if(T0->Type == EntityType_Enemy && T1->Type == EntityType_Bullet_Enemy){
+    CanCollide = false;
+  }
+
+  // This should be OBB!!!
   return CanCollide && Collision_Rect_Rect(C0->Extents, V2f(P0->X, P0->Y), C1->Extents, V2f(P1->X, P1->Y));
 }
 
 void CollisionDetection(game_state* GameState)
 {
-  query_result Query = EntityManager_Query(&GameState->EntityManager, COLLIDER_MASK);
+  query_result Query = EntityManager_Query(&GameState->EntityManager, COLLIDER_MASK | POSITION_MASK | TYPE_MASK);
   for (u32 First = 0; First < Query.Count - 1; First++)
   {
     entity              FirstEntity   = Query.Ids[First];
     collider_component* FirstCollider = (collider_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, FirstEntity, COLLIDER_ID);
     position_component* FirstPosition = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, FirstEntity, POSITION_ID);
+    type_component *    FirstType     = (type_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, FirstEntity, TYPE_ID);
     for (u32 Second = First + 1; Second < Query.Count; Second++)
     {
       if (First != Second)
@@ -236,7 +254,8 @@ void CollisionDetection(game_state* GameState)
         entity              SecondEntity   = Query.Ids[Second];
         collider_component* SecondCollider = (collider_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, SecondEntity, COLLIDER_ID);
         position_component* SecondPosition = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, SecondEntity, POSITION_ID);
-        if (IsColliding(FirstCollider, FirstPosition, SecondCollider, SecondPosition))
+        type_component *    SecondType     = (type_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, SecondEntity, TYPE_ID);
+        if (IsColliding(FirstType, FirstCollider, FirstPosition, SecondType, SecondCollider, SecondPosition))
         {
           health_component* FirstHealth = (health_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, FirstEntity, HEALTH_ID);
           if (FirstHealth)
@@ -250,6 +269,49 @@ void CollisionDetection(game_state* GameState)
           }
         }
       }
+    }
+  }
+
+  for (u32 QueryIndex = 0; QueryIndex < Query.Count - 1; QueryIndex++)
+  {
+    entity              Entity   = Query.Ids[QueryIndex];
+    collider_component* Collider = (collider_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, COLLIDER_ID);
+    position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
+    type_component *    Type     = (type_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, TYPE_ID);
+    if(Type->Type == EntityType_Player)
+    {
+      // Check if we're hitting the wall
+      // Clamp the position
+      f32 MinX = Position->X - Collider->Extents.X;
+      f32 MaxX = Position->X + Collider->Extents.X;
+
+      f32 MinY = Position->Y - Collider->Extents.Y;
+      f32 MaxY = Position->Y + Collider->Extents.Y;
+
+      if(MinX < 0)
+      {
+        Position->X = Collider->Extents.X;
+      }
+      else if(MaxX >= GameState->ScreenWidth - 1)
+      {
+        Position->X = GameState->ScreenWidth - Collider->Extents.X - 1;
+      }
+
+      if(MinY < 0)
+      {
+        Position->Y = Collider->Extents.Y;
+      }
+      else if(MaxY >= GameState->ScreenHeight - 1)
+      {
+        Position->Y = GameState->ScreenHeight - Collider->Extents.Y - 1;
+      }
+
+    }
+    else if(Type->Type == EntityType_Enemy)
+    {
+      // Check if we're hitting the wall
+      // If so reflect the rotation
+      // Then clamp the position
     }
   }
 }
@@ -278,7 +340,7 @@ void RemoveDeadUnits(game_state* GameState)
 
 void SpawnEnemy(game_state* GameState, position_component Position)
 {
-  u32                Mask      = COLLIDER_MASK | RENDER_MASK | POSITION_MASK | HEALTH_MASK | VELOCITY_MASK;
+  u32                Mask      = COLLIDER_MASK | RENDER_MASK | POSITION_MASK | HEALTH_MASK | VELOCITY_MASK | TYPE_MASK;
   entity             Entity    = EntityManager_Create_Entity(&GameState->EntityManager, Mask);
 
   health_component Health      = {};
@@ -289,17 +351,17 @@ void SpawnEnemy(game_state* GameState, position_component Position)
   Render.FlippedZ              = false;
   collider_component Collider  = {};
   Collider.Extents             = V2f(Render.Texture->Width * 0.5f, Render.Texture->Height * 0.5f);
-  Collider.ColliderIsMask      = ENEMY_MASK;
-  Collider.CanCollideWithMask  = PLAYER_MASK | PLAYER_BULLET_MASK;
   velocity_component Velocity = {};
   Velocity.Y = 100.0f;
 
-  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 5, &Health, &Position, &Velocity, &Render, &Collider);
+  type_component Type = {};
+  Type.Type = EntityType_Enemy;
+  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type);
 }
 
 void RemoveOutOfBoundsUnits(game_state* GameState)
 {
-  query_result Query         = EntityManager_Query(&GameState->EntityManager, POSITION_MASK | COLLIDER_MASK);
+  query_result Query         = EntityManager_Query(&GameState->EntityManager, POSITION_MASK | COLLIDER_MASK | TYPE_MASK);
 
   vec2f        ScreenExtents = V2f(GameState->ScreenWidth * 0.5f, GameState->ScreenHeight * 0.5f);
   vec2f        ScreenCenter  = V2f(GameState->ScreenWidth * 0.5f, GameState->ScreenHeight * 0.5f);
@@ -308,8 +370,8 @@ void RemoveOutOfBoundsUnits(game_state* GameState)
     entity              Entity   = Query.Ids[QueryIndex];
     position_component* Position = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
     collider_component* Collider = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, COLLIDER_ID);
-
-    if (Collider->ColliderIsMask != ENEMY_MASK && !Collision_Rect_Rect(ScreenExtents, ScreenCenter, Collider->Extents, V2f(Position->X, Position->Y)))
+    type_component    * Type     = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, TYPE_ID);
+    if (Type->Type != EntityType_Enemy && !Collision_Rect_Rect(ScreenExtents, ScreenCenter, Collider->Extents, V2f(Position->X, Position->Y)))
     {
       EntityManager_Remove_Entity(&GameState->EntityManager, Entity);
     }
@@ -322,7 +384,7 @@ position_component GetRandomEnemySpawnPosition(game_state* GameState)
   Result.X                  = rand() / (f32)RAND_MAX * GameState->ScreenWidth;
   Result.Y                  = rand() / (f32)RAND_MAX * GameState->ScreenHeight * -0.25f - GameState->ScreenHeight * 0.2f;
 
-  Result.Rotation           = 0;
+  Result.Rotation           = (rand() / (f32)RAND_MAX + 1) * PI / 2;
 
   return Result;
 }
@@ -330,13 +392,14 @@ position_component GetRandomEnemySpawnPosition(game_state* GameState)
 void RespawnOutOfBoundsEnemies(game_state* GameState)
 {
 
-  query_result Query = EntityManager_Query(&GameState->EntityManager, COLLIDER_MASK);
+  query_result Query = EntityManager_Query(&GameState->EntityManager, COLLIDER_MASK | TYPE_MASK);
   u32          Count = Query.Count;
   for (u32 QueryIndex = 0; QueryIndex < Count; QueryIndex++)
   {
     entity              Entity   = Query.Ids[QueryIndex];
     collider_component* Collider = (collider_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, COLLIDER_ID);
-    if (Collider->ColliderIsMask == ENEMY_MASK)
+    type_component * Type        = (type_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, TYPE_ID);
+    if (Type->Type == EntityType_Enemy)
     {
       position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
 
@@ -367,7 +430,7 @@ void CommandBuffer_PushDecideSpawn(command_buffer* Buffer, f32 Time, u32 Enemies
   command Command = {};
   Command.Time    = Time;
   Command.Type    = Command_DecideSpawn;
-  Command.EnemiesToSpawn = 0; EnemiesToSpawn;
+  Command.EnemiesToSpawn = EnemiesToSpawn;
   CommandBuffer_PushCommand(Buffer, Command);
 }
 void ExecuteNewCommands(game_state* GameState)
@@ -445,8 +508,8 @@ GAME_UPDATE(GameUpdate)
 
     LoadTextures(GameState, Memory);
 
-    EntityManager_Create(&GameState->PermanentArena, &GameState->EntityManager, 256, 5, sizeof(health_component), sizeof(position_component), sizeof(velocity_component), sizeof(render_component),
-                         sizeof(collider_component));
+    EntityManager_Create(&GameState->PermanentArena, &GameState->EntityManager, 256, 6, sizeof(health_component), sizeof(position_component), sizeof(velocity_component), sizeof(render_component),
+                         sizeof(collider_component), sizeof(type_component));
     CreatePlayer(GameState);
     Memory->IsInitialized = true;
   }

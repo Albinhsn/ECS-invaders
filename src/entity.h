@@ -9,12 +9,29 @@
 #define VELOCITY_ID   2
 #define RENDER_ID     3
 #define COLLIDER_ID   4
+#define TYPE_ID       5
 
 #define HEALTH_MASK   (1 << HEALTH_ID)
 #define POSITION_MASK (1 << POSITION_ID)
 #define VELOCITY_MASK (1 << VELOCITY_ID)
 #define RENDER_MASK   (1 << RENDER_ID)
 #define COLLIDER_MASK (1 << COLLIDER_ID)
+#define TYPE_MASK     (1 << TYPE_ID)
+
+
+
+typedef enum entity_type
+{
+  EntityType_Player,
+  EntityType_Enemy,
+  EntityType_Bullet_Enemy,
+  EntityType_Bullet_Player
+} entity_type;
+
+typedef struct type_component
+{
+  entity_type Type;
+} type_component;
 
 typedef struct health_component
 {
@@ -42,16 +59,9 @@ typedef struct render_component
   bool     FlippedZ;
 } render_component;
 
-#define ENEMY_MASK  (1 << 1)
-#define PLAYER_MASK (1 << 2)
-#define ENEMY_BULLET_MASK  (1 << 3)
-#define PLAYER_BULLET_MASK (1 << 4)
-
 typedef struct collider_component
 {
   vec2f Extents;
-  u8    CanCollideWithMask;
-  u8    ColliderIsMask;
   u8    Collided;
 } collider_component;
 

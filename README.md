@@ -4,7 +4,7 @@ Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading and 
 The ECS way is to create systems or components to solve things
 * Needs extra data for something
     * Create a component
-* THen create the system that solves that problem
+* Then create the system that solves that problem
 
 # Things i'd like to solve in this project
 * ECS
@@ -31,13 +31,14 @@ The ECS way is to create systems or components to solve things
 
 
 # ToDo
-* Test If the new renderer works outside of screen etc
-
+* Figure out enemy shooting
+* Figure out enemy reflecting on the walls
+  * I.e they should spawn with a rotation to follow first
+  * And when they hit a wall they should reflect their rotation
 * Get a handle of the timer stuff in win32
-* Fix dt bug?
-* Make like a TypeComponent or smth
-* Make enemies shoot as well
-    * Both you and this can have a cd and just check it?
+  * Fix dt bug?
+
+
 * Audio
     * Figure out how we want to send sound from game <-> platform
         * Commands?
@@ -55,6 +56,7 @@ The ECS way is to create systems or components to solve things
     * IM Layout library
     * Render the layout
 
+* Particle system
 
 ----
 * CommandBuffer
