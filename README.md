@@ -31,12 +31,6 @@ The ECS way is to create systems or components to solve things
 
 
 # ToDo
-* Figure out enemy shooting
-* Figure out enemy reflecting on the walls
-  * I.e they should spawn with a rotation to follow first
-  * And when they hit a wall they should reflect their rotation
-* Render Health
-
 * Get a handle of the timer stuff in win32
   * Fix dt bug?
 
@@ -54,6 +48,7 @@ The ECS way is to create systems or components to solve things
 
 * SDF Font Rendering
   * Render score
+  
 * UI
     * IM Layout library
     * Render the layout

@@ -10,6 +10,7 @@
 #define RENDER_ID     3
 #define COLLIDER_ID   4
 #define TYPE_ID       5
+#define SHOOT_ID      6
 
 #define HEALTH_MASK   (1 << HEALTH_ID)
 #define POSITION_MASK (1 << POSITION_ID)
@@ -17,7 +18,7 @@
 #define RENDER_MASK   (1 << RENDER_ID)
 #define COLLIDER_MASK (1 << COLLIDER_ID)
 #define TYPE_MASK     (1 << TYPE_ID)
-
+#define SHOOT_MASK    (1 << SHOOT_ID)
 
 
 typedef enum entity_type
@@ -64,6 +65,11 @@ typedef struct collider_component
   vec2f Extents;
   u8    Collided;
 } collider_component;
+
+typedef struct shoot_component
+{
+  f32 TimeToShoot;
+} shoot_component;
 
 typedef struct query_result
 {

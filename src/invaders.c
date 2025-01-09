@@ -115,10 +115,10 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
     vec2f YAxis = {};
     YAxis.X = cosf(Position->Rotation + PI / 2);
     YAxis.Y = sinf(Position->Rotation + PI / 2);
-
-
-
     YAxis = Vec2f_Scale(YAxis, -(f32)Render->Texture->Height);
+
+
+
     vec2f Origin = Vec2f_Sub(Vec2f_Sub(V2f(Position->X, Position->Y), Vec2f_Scale(XAxis, 0.5f)), Vec2f_Scale(YAxis, 0.5f));
     Pushbuffer_PushRectTexture(Pushbuffer, Render->Texture, Origin,  XAxis, YAxis, Render->FlippedZ);
     // Pushbuffer_PushRectColor(Pushbuffer, Origin, XAxis, YAxis, 0x0000FF00);
@@ -163,7 +163,7 @@ void UseInput(game_state* GameState, game_input* Input)
   Velocity->X                        = 0;
   Velocity->Y                        = 0;
 
-  float PlayerVelocity               = 100.0f;
+  float PlayerVelocity               = 300.0f;
   float DeltaTime                    = GameState->DeltaTime;
   if (Input->Up)
   {
@@ -414,9 +414,15 @@ void RemoveDeadUnits(game_state* GameState)
   }
 }
 
+f32 GetNextShootTime(f32 CurrentTime)
+{
+  f32 Cooldown = 3.0f;
+  return rand() / (f32)RAND_MAX * Cooldown + CurrentTime;
+}
+
 void SpawnEnemy(game_state* GameState, position_component Position)
 {
-  u32                Mask      = COLLIDER_MASK | RENDER_MASK | POSITION_MASK | HEALTH_MASK | VELOCITY_MASK | TYPE_MASK;
+  u32                Mask      = COLLIDER_MASK | RENDER_MASK | POSITION_MASK | HEALTH_MASK | VELOCITY_MASK | TYPE_MASK |SHOOT_MASK;
   entity             Entity    = EntityManager_Create_Entity(&GameState->EntityManager, Mask);
 
   health_component Health      = {};
@@ -428,11 +434,14 @@ void SpawnEnemy(game_state* GameState, position_component Position)
   collider_component Collider  = {};
   Collider.Extents             = V2f(Render.Texture->Width * 0.5f, Render.Texture->Height * 0.5f);
   velocity_component Velocity = {};
-  Velocity.Y = 100.0f;
+  Velocity.Y = 200.0f;
 
   type_component Type = {};
   Type.Type = EntityType_Enemy;
-  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type);
+
+  shoot_component Shoot = {};
+  Shoot.TimeToShoot = GetNextShootTime(GameState->CommandBuffer.Time);
+  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type, &Shoot);
 }
 
 void RemoveOutOfBoundsUnits(game_state* GameState)
@@ -558,12 +567,92 @@ void CleanupEntities(game_state* GameState)
   RemoveOutOfBoundsUnits(GameState);
 }
 
+void RenderHealth(game_state * GameState, pushbuffer * Pushbuffer)
+{
+  health_component * Health = EntityManager_GetComponentFromEntity(&GameState->EntityManager, GameState->PlayerEntity, HEALTH_ID);
+  f32 X = 25, Y = 25;
+  f32 XOffset = 30;
+
+  const char * FilledHeartTextureName = "filledHeart";
+  texture * FilledHeartTexture = GetTextureByName(GameState, (u8*)FilledHeartTextureName);
+
+  const char * UnfilledHeartTextureName = "unfilledHeart";
+  texture * UnfilledHeartTexture = GetTextureByName(GameState, (u8*)UnfilledHeartTextureName);
+
+  // ToDo find somewhere else?
+  s32 MaxHealth = 3;
+  for(s32 HealthIndex = 0; HealthIndex < Health->Health; HealthIndex++)
+  {
+    vec2f Origin = {};
+    Origin.X = X - 0.5f * FilledHeartTexture->Width;
+    Origin.Y = Y - 0.5f * FilledHeartTexture->Height;
+    vec2f XAxis = V2f((f32)FilledHeartTexture->Width, 0);
+    vec2f YAxis = V2f(0, (f32)FilledHeartTexture->Height);
+    Pushbuffer_PushRectTexture(Pushbuffer, FilledHeartTexture, Origin, XAxis, YAxis, true);
+    X += XOffset;
+
+  }
+  for(s32 HealthIndex = Health->Health; HealthIndex < MaxHealth; HealthIndex++)
+  {
+    vec2f Origin = {};
+    Origin.X = X - 0.5f * UnfilledHeartTexture->Width;
+    Origin.Y = Y - 0.5f * UnfilledHeartTexture->Height;
+    vec2f XAxis = V2f((f32)UnfilledHeartTexture->Width, 0);
+    vec2f YAxis = V2f(0, (f32)UnfilledHeartTexture->Height);
+    Pushbuffer_PushRectTexture(Pushbuffer, UnfilledHeartTexture, Origin, XAxis, YAxis, true);
+    X += XOffset;
+  }
+}
+
+void HandleEnemyShooting(game_state * GameState)
+{
+  query_result Query = EntityManager_Query(&GameState->EntityManager, SHOOT_MASK);
+  for(u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
+  {
+    entity Entity         = Query.Ids[QueryIndex];
+    shoot_component *Shoot = (shoot_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, SHOOT_ID);
+    if(Shoot->TimeToShoot <= GameState->CommandBuffer.Time)
+    {
+      position_component * EnemyPosition = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
+
+      vec2f YAxis = {};
+      YAxis.X = cosf(EnemyPosition->Rotation + PI / 2);
+      YAxis.Y = sinf(EnemyPosition->Rotation + PI / 2);
+
+
+      u32                BulletMask =  RENDER_MASK | POSITION_MASK | VELOCITY_MASK | COLLIDER_MASK | TYPE_MASK;
+      entity             Bullet     =  EntityManager_Create_Entity(&GameState->EntityManager, BulletMask);
+      position_component Position   =  *EnemyPosition;
+      vec2f PositionOffset          =  Vec2f_Scale(YAxis, 40);
+      Position.X                    += PositionOffset.X;
+      Position.Y                    += PositionOffset.Y;
+
+
+      render_component Render     = {};
+      Render.Alpha                = 1.0f;
+      const char* TextureName     = "spaceMissiles2";
+      Render.Texture              = GetTextureByName(GameState, (u8*)TextureName);
+      Render.FlippedZ             = true;
+      velocity_component Velocity = {};
+      Velocity.Y                  = 400.0f;
+      collider_component Collider = {};
+
+
+      type_component Type = {};
+      Type.Type = EntityType_Bullet_Enemy;
+      EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 5, &Position, &Velocity, &Render, &Collider, &Type);
+      Shoot->TimeToShoot  = GetNextShootTime(GameState->CommandBuffer.Time);
+    }
+  }
+}
+
 GAME_UPDATE(GameUpdate)
 {
 
   game_state* GameState = (game_state*)Memory->PermanentStorage;
   Assert(GameState->CommandBuffer.Time >= 0);
   GameState->DeltaTime  = Memory->DeltaTime;
+  GameState->Score += GameState->DeltaTime * 1000;
   Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
   if (!Memory->IsInitialized)
   {
@@ -585,8 +674,8 @@ GAME_UPDATE(GameUpdate)
 
     LoadTextures(GameState, Memory);
 
-    EntityManager_Create(&GameState->PermanentArena, &GameState->EntityManager, 256, 6, sizeof(health_component), sizeof(position_component), sizeof(velocity_component), sizeof(render_component),
-                         sizeof(collider_component), sizeof(type_component));
+    EntityManager_Create(&GameState->PermanentArena, &GameState->EntityManager, 256, 7, sizeof(health_component), sizeof(position_component), sizeof(velocity_component), sizeof(render_component),
+                         sizeof(collider_component), sizeof(type_component), sizeof(shoot_component));
     CreatePlayer(GameState);
     Memory->IsInitialized = true;
   }
@@ -597,7 +686,7 @@ GAME_UPDATE(GameUpdate)
   UseInput(GameState, Input);
   ExecuteNewCommands(GameState);
   UpdatePhysics(GameState);
-
+  HandleEnemyShooting(GameState);
   CollisionDetection(GameState, Pushbuffer);
   CleanupEntities(GameState);
 
@@ -605,8 +694,8 @@ GAME_UPDATE(GameUpdate)
   {
     Assert(GameState->CommandBuffer.Time >= 0);
   }
+  RenderHealth(GameState, Pushbuffer);
 
-  // Draw a quad in the middle of the screen
 
 
 

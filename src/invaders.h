@@ -37,17 +37,18 @@ struct texture_node
 
 typedef struct game_state
 {
-  arena          PermanentArena;
-  arena          TemporaryArena;
+  arena           PermanentArena;
+  arena           TemporaryArena;
 
-  entity_manager EntityManager;
-  entity         PlayerEntity;
-  texture*       Textures;
-  command_buffer CommandBuffer;
-  u32            ScreenWidth, ScreenHeight;
-  u32            TextureCount;
-  f32            DeltaTime;
-  vec2f          PlayerPosition;
+  entity_manager  EntityManager;
+  entity          PlayerEntity;
+  texture*        Textures;
+  command_buffer  CommandBuffer;
+  u32             ScreenWidth, ScreenHeight;
+  u32             TextureCount;
+  f32             DeltaTime;
+  vec2f           PlayerPosition;
+  f32             Score;
 } game_state;
 
 #endif
