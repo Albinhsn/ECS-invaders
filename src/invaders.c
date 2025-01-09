@@ -106,7 +106,7 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
     render_component*   Render   = (render_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, RENDER_ID);
 
     // Is the bottom left corner!
-    vec2f Origin = V2f(Position->X - Render->Texture->Width * 0.5f, Position->Y + Render->Texture->Height * 0.5f);
+
     vec2f XAxis = {};
     XAxis.X = cosf(Position->Rotation);
     XAxis.Y = sinf(Position->Rotation);
@@ -116,8 +116,12 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
     YAxis.X = cosf(Position->Rotation + PI / 2);
     YAxis.Y = sinf(Position->Rotation + PI / 2);
 
+
+
     YAxis = Vec2f_Scale(YAxis, -(f32)Render->Texture->Height);
+    vec2f Origin = Vec2f_Sub(Vec2f_Sub(V2f(Position->X, Position->Y), Vec2f_Scale(XAxis, 0.5f)), Vec2f_Scale(YAxis, 0.5f));
     Pushbuffer_PushRectTexture(Pushbuffer, Render->Texture, Origin,  XAxis, YAxis, Render->FlippedZ);
+    // Pushbuffer_PushRectColor(Pushbuffer, Origin, XAxis, YAxis, 0x0000FF00);
 
   }
 }
@@ -214,8 +218,6 @@ void UpdatePhysics(game_state* GameState)
     position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
     velocity_component* Velocity = (velocity_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, VELOCITY_ID);
 
-
-
     // Calculate the X and Y axis given this rotation
     vec2f XAxis = {};
     XAxis.X = cosf(Position->Rotation);
@@ -232,6 +234,7 @@ void UpdatePhysics(game_state* GameState)
 
     Position->X  = Pos.X;
     Position->Y = Pos.Y;
+    // Position->Rotation += GameState->DeltaTime;
   }
 }
 
@@ -344,17 +347,14 @@ void CollisionDetection(game_state* GameState, pushbuffer * Pushbuffer)
       XAxis = Vec2f_Scale(XAxis, Collider->Extents.X * 2);
       YAxis = Vec2f_Scale(YAxis, -Collider->Extents.Y * 2);
 
-      #if 0
-      vec2f HalfXAxis = Vec2f_Scale(XAxis, 0.5f);
-      vec2f HalfYAxis = Vec2f_Scale(YAxis, 0.5f);
-      #endif
-
-      vec2f Pos = Vec2f_Sub(XAxis, Vec2f_Sub(YAxis, V2f(Position->X, Position->Y)));
-      vec2f v0 = Pos;
+      vec2f Origin = Vec2f_Sub(Vec2f_Sub(V2f(Position->X, Position->Y), Vec2f_Scale(XAxis, 0.5f)), Vec2f_Scale(YAxis, 0.5f));
+      vec2f v0 = Origin;
       vec2f v1 = Vec2f_Add(v0, XAxis);
       vec2f v2 = Vec2f_Add(v0, YAxis);
       vec2f v3 = Vec2f_Add(v2, XAxis);
-      Pushbuffer_PushRectColor(Pushbuffer, Pos, XAxis, YAxis, 0x00FF0000);
+
+
+
 
       f32 MinX =  10000;
       f32 MaxX = -10000;
@@ -373,19 +373,21 @@ void CollisionDetection(game_state* GameState, pushbuffer * Pushbuffer)
         vec2f Reflected = Vec2f_Reflect(YAxis, V2f(1,0));
         f32 NewRotation = atan2f(Reflected.Y, Reflected.X) + PI / 2;
         Position->Rotation = NewRotation;
-        Position->X = 0 + Abs(MaxX - MinX);
+        Position->X  -= MinX - 0.0001f;
       }
       else if(MaxX >= GameState->ScreenWidth - 1)
       {
-
-      }else
-      {
-
+        vec2f Reflected = Vec2f_Reflect(YAxis, V2f(-1,0));
+        f32 NewRotation = atan2f(Reflected.Y, Reflected.X) + PI / 2;
+        Position->Rotation = NewRotation;
+        Position->X  -= MaxX - GameState->ScreenWidth + 1;
+      }
+      else{
       }
       Assert(Position->X >= 0);
+      Assert(Position->X < GameState->ScreenWidth - 1);
 
-      // If so reflect the rotation
-      // Then clamp the position af
+
     }
   }
 }

@@ -579,6 +579,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     Win32_ProcessMessages(&GameInput);
 
+    DeltaTime = Min(DeltaTime, 1.0f / 30.0f);
     GameMemory.DeltaTime    = DeltaTime;
     GameMemory.ScreenWidth  = GlobalScreenWidth;
     GameMemory.ScreenHeight = GlobalScreenHeight;
