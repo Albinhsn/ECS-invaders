@@ -73,6 +73,7 @@ typedef struct win32_audio
   WAVEFORMATEXTENSIBLE*        WaveFormat;
   u32                  BufferFrameCount;
   HANDLE RefillEvent;
+  game_audio GameAudio;
 } win32_audio;
 
 #endif

@@ -20,6 +20,13 @@ typedef struct game_memory
   bool (*ReadFile)(arena* Arena, const char* Filename, u8** Buffer, u32* Size);
 } game_memory;
 
+typedef struct game_audio
+{
+  f32 * Buffer;
+  u32 Channels;
+  u32 SampleFrameCount;
+} game_audio;
+
 typedef struct game_input
 {
   u32 Up;
@@ -30,7 +37,7 @@ typedef struct game_input
 
 } game_input;
 
-#define GAME_UPDATE(name) void name(game_memory* Memory, game_input* Input, pushbuffer* Pushbuffer)
+#define GAME_UPDATE(name) void name(game_memory* Memory, game_input* Input, pushbuffer* Pushbuffer, game_audio * Audio)
 typedef GAME_UPDATE(game_update);
 
 #endif

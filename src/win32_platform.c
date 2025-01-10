@@ -359,6 +359,8 @@ bool Win32_InitAudio()
     return false;
   }
 
+  game_audio * GameAudio = &GlobalAudio.GameAudio;
+
   return true;
 }
 
@@ -583,7 +585,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     GameMemory.DeltaTime    = DeltaTime;
     GameMemory.ScreenWidth  = GlobalScreenWidth;
     GameMemory.ScreenHeight = GlobalScreenHeight;
-    GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
+    GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer, &GlobalAudio.GameAudio);
 
     Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);
     Pushbuffer_Reset(&Pushbuffer);
@@ -595,7 +597,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     char          FrameTimeBuf[1024] = {};
     sprintf_s(FrameTimeBuf, ArrayCount(FrameTimeBuf), "Frame: %.4f\n", FrameTimeMSF);
-    OutputDebugStringA(FrameTimeBuf);
+    // OutputDebugStringA(FrameTimeBuf);
 
     if (FrameTimeMS < TargetFrameTimeMS)
     {

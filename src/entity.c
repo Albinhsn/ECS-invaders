@@ -37,7 +37,7 @@ void EntityManager_Create(arena* Arena, entity_manager* Manager, u32 MaxEntityCo
 query_result EntityManager_Query(entity_manager* Manager, u32 ComponentMask)
 {
   Manager->Result.Count = 0;
-  for (u32 EntityIndex = 0; EntityIndex < Manager->EntityCount; EntityIndex++)
+  for (u32 EntityIndex = 0; EntityIndex < Manager->MaxEntityCount; EntityIndex++)
   {
 
     u32 EntityMask = Manager->Masks[EntityIndex];
@@ -90,10 +90,13 @@ entity EntityManager_Create_Entity(entity_manager* Manager, u32 ComponentMask)
     Assert(0 && "To many entities!");
   }
 
+
+
   // Get an entity out of the free list
   ++Manager->EntityCount;
   u32    EntityIndex = Manager->MaxEntityCount - Manager->EntityCount;
   entity Entity      = Manager->EntityFreeList[EntityIndex];
+  Assert((Manager->Masks[Entity] & (1 << 31)) == 0);
 
   // Set it's mask bit as alive
   Manager->Masks[Entity] = (1 << 31) | ComponentMask;
@@ -101,15 +104,17 @@ entity EntityManager_Create_Entity(entity_manager* Manager, u32 ComponentMask)
   return Entity;
 }
 
-void EntityManager_Remove_Entity(entity_manager* Manager, entity Entity)
+void EntityManager_Remove_Entity(entity_manager* Manager, entity Entity, const char * Cause)
 {
   Assert(Manager->EntityCount > 1 && "Can't remove the only entity? xD");
 
-  Manager->Masks[Entity] = 0;
 
-  Manager->EntityCount--;
+
   u32 EntityIndex                      = Manager->MaxEntityCount - Manager->EntityCount;
+
   Manager->EntityFreeList[EntityIndex] = Entity;
+  Manager->EntityCount--;
+  Manager->Masks[Entity] = 0;
 }
 
 void EntityManager_Remove_Components(entity_manager* Manager, entity Entity, u32 ComponentMask)

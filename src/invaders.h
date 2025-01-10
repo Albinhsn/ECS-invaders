@@ -4,6 +4,7 @@
 #include "common.h"
 #include "entity.h"
 #include "vector.h"
+#include "sound.h"
 
 typedef enum command_type
 {
@@ -49,6 +50,12 @@ typedef struct game_state
   f32             DeltaTime;
   vec2f           PlayerPosition;
   f32             Score;
+
+  playing_sound PlayingSounds[16];
+  u32 PlayingSoundCount;
+  sound Sounds[16];
+  u32 SoundsCount;
+
 } game_state;
 
 #endif

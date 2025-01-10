@@ -4,6 +4,7 @@
 
 typedef struct sound
 {
+  string Name;
   f32 * Samples;
   u32 SampleRate;
   u32 ByteRate;
@@ -17,7 +18,7 @@ typedef struct sound
 typedef struct playing_sound
 {
   f32 Volume;
-  u32 Id;
+  sound* Sound;
   u32 SamplesPlayed;
 } playing_sound;
 

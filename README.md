@@ -9,8 +9,7 @@ The ECS way is to create systems or components to solve things
 # Things i'd like to solve in this project
 * ECS
 * Basic Audio
-* Multithreading
-* Scaling textures
+* Software Renderer
 * Basic UI
 * OpenGL renderer
 
@@ -28,30 +27,23 @@ The ECS way is to create systems or components to solve things
 * SIMD
 * Work Queue
 * Roll your own printf
+* Font rendering
 
 
 # ToDo
 * Get a handle of the timer stuff in win32
   * Fix dt bug?
 
-
 * Audio
-    * Figure out how we want to send sound from game <-> platform
-        * Commands?
-        * Different buffer?
-        * This feels like it's just play and then you store what sounds you want, for how long etc
-            * PlaySound(&Sound, Description);
-                * Should the Usage code look like at least
-            * Just store an Array of sounds that are currently playing
-        * Do it in 32-bit float :)
-    * Sound Mixer
+    * Every frame we write 33 ms (the next frame) of sound into a buffer
+      * I.e we need to do audio mixing every frame in the game code
+    * That buffer gets copied from on the audio thread
 
-* SDF Font Rendering
-  * Render score
-  
 * UI
     * IM Layout library
     * Render the layout
+
+* Render score
 
 ----
 * CommandBuffer

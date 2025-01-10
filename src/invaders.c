@@ -6,6 +6,19 @@
 #include "vector.c"
 #include <debugapi.h>
 
+void WriteSound(game_state *GameState, game_audio * Audio)
+{
+  // Iterate over playing sounds
+  //  If the sound is "over", then remove it from the list
+
+}
+
+void Inv_PlaySound(game_state * GameState, const char * SoundName)
+{
+  // Find the sound
+  // Add it to playing sounds
+}
+
 texture* GetTextureByName(game_state* GameState, u8* TextureName)
 {
 
@@ -97,7 +110,7 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
 {
 
   query_result Query = EntityManager_Query(&GameState->EntityManager, POSITION_MASK | RENDER_MASK);
-  for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
+  for (s32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
 
     entity              Entity   = Query.Ids[QueryIndex];
@@ -129,7 +142,7 @@ void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
 void CreatePlayer(game_state* GameState)
 {
 
-  u32              Mask                = POSITION_MASK | HEALTH_MASK | RENDER_MASK | COLLIDER_MASK | VELOCITY_MASK |TYPE_MASK;
+  u32              Mask                = POSITION_MASK | HEALTH_MASK | RENDER_MASK | COLLIDER_MASK | VELOCITY_MASK |TYPE_MASK |SHOOT_MASK;
   entity           Entity              = EntityManager_Create_Entity(&GameState->EntityManager, Mask);
 
   health_component Health              = {};
@@ -147,9 +160,12 @@ void CreatePlayer(game_state* GameState)
   collider_component Collider          = {};
   Collider.Extents                     = V2f(Render.Texture->Width * 0.5f, Render.Texture->Height * 0.5f);
 
+  shoot_component Shoot = {};
+
+
   type_component Type = {};
   Type.Type = EntityType_Player;
-  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type);
+  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 7, &Health, &Position, &Velocity, &Render, &Collider, &Type, &Shoot);
   GameState->PlayerEntity = Entity;
 }
 
@@ -159,7 +175,7 @@ void UseInput(game_state* GameState, game_input* Input)
   entity              Entity         = GameState->PlayerEntity;
   velocity_component* Velocity       = (velocity_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, VELOCITY_ID);
   position_component* PlayerPosition = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
-
+  shoot_component * Shoot            = (shoot_component*) EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, SHOOT_ID);
   Velocity->X                        = 0;
   Velocity->Y                        = 0;
 
@@ -186,8 +202,8 @@ void UseInput(game_state* GameState, game_input* Input)
   Velocity->X              = NormalizedVelocity.X * PlayerVelocity;
   Velocity->Y              = NormalizedVelocity.Y * PlayerVelocity;
 
-  // u32 Shoot;
-  if (Input->Shoot)
+
+  if (Input->Shoot && Shoot->TimeToShoot <= GameState->CommandBuffer.Time)
   {
     u32                BulletMask = RENDER_MASK | POSITION_MASK | VELOCITY_MASK | COLLIDER_MASK | TYPE_MASK;
     entity             Bullet     = EntityManager_Create_Entity(&GameState->EntityManager, BulletMask);
@@ -201,17 +217,22 @@ void UseInput(game_state* GameState, game_input* Input)
     velocity_component Velocity = {};
     Velocity.Y                  = -200.0f;
     collider_component Collider = {};
+    Collider.Extents.X = Render.Texture->Width * 0.5f;
+    Collider.Extents.Y = Render.Texture->Height  * 0.5f;
 
     type_component Type = {};
     Type.Type = EntityType_Bullet_Player;
     EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 5, &Position, &Velocity, &Render, &Collider, &Type);
+
+    f32 ShootCooldown = 1.0f;
+    Shoot->TimeToShoot = GameState->CommandBuffer.Time + ShootCooldown;
   }
 }
 
 void UpdatePhysics(game_state* GameState)
 {
   query_result Query = EntityManager_Query(&GameState->EntityManager, VELOCITY_MASK | POSITION_MASK);
-  for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
+  for (s32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
     entity              Entity   = Query.Ids[QueryIndex];
 
@@ -250,14 +271,21 @@ bool Collision_OBB_OBB(f32 r0, vec2f e0, vec2f p0, f32 r1, vec2f e1, vec2f p1)
 
 bool IsColliding(type_component * T0, collider_component* C0, position_component* P0, type_component * T1, collider_component* C1, position_component* P1)
 {
+
   bool CanCollide = true;
   if(T0->Type == T1->Type){
     CanCollide = false;
   }
-  else if(T0->Type == EntityType_Player && T1->Type == EntityType_Bullet_Player){
+  else if(
+    (T0->Type == EntityType_Player && T1->Type == EntityType_Bullet_Player) ||
+    (T0->Type == EntityType_Bullet_Player && T1->Type == EntityType_Player)
+    ){
     CanCollide = false;
   }
-  else if(T0->Type == EntityType_Enemy && T1->Type == EntityType_Bullet_Enemy){
+  else if(
+    (T0->Type == EntityType_Enemy && T1->Type == EntityType_Bullet_Enemy) ||
+    (T0->Type == EntityType_Bullet_Enemy && T1->Type == EntityType_Enemy)
+    ){
     CanCollide = false;
   }
 
@@ -268,13 +296,13 @@ bool IsColliding(type_component * T0, collider_component* C0, position_component
 void CollisionDetection(game_state* GameState, pushbuffer * Pushbuffer)
 {
   query_result Query = EntityManager_Query(&GameState->EntityManager, COLLIDER_MASK | POSITION_MASK | TYPE_MASK);
-  for (u32 First = 0; First < Query.Count - 1; First++)
+  for (s32 First = 0; First < Query.Count - 1; First++)
   {
     entity              FirstEntity   = Query.Ids[First];
     collider_component* FirstCollider = (collider_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, FirstEntity, COLLIDER_ID);
     position_component* FirstPosition = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, FirstEntity, POSITION_ID);
     type_component *    FirstType     = (type_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, FirstEntity, TYPE_ID);
-    for (u32 Second = First + 1; Second < Query.Count; Second++)
+    for (s32 Second = First + 1; Second < Query.Count; Second++)
     {
       if (First != Second)
       {
@@ -299,7 +327,7 @@ void CollisionDetection(game_state* GameState, pushbuffer * Pushbuffer)
     }
   }
 
-  for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
+  for (s32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
     entity              Entity   = Query.Ids[QueryIndex];
     collider_component* Collider = (collider_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, COLLIDER_ID);
@@ -395,7 +423,7 @@ void CollisionDetection(game_state* GameState, pushbuffer * Pushbuffer)
 void RemoveDeadUnits(game_state* GameState)
 {
   query_result Query = EntityManager_Query(&GameState->EntityManager, HEALTH_MASK);
-  for (u32 EntityIndex = 0; EntityIndex < Query.Count; EntityIndex++)
+  for (s32 EntityIndex = 0; EntityIndex < Query.Count; EntityIndex++)
   {
     entity            Entity = Query.Ids[EntityIndex];
     health_component* Health = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, HEALTH_ID);
@@ -408,7 +436,7 @@ void RemoveDeadUnits(game_state* GameState)
       }
       else
       {
-        EntityManager_Remove_Entity(&GameState->EntityManager, Entity);
+        EntityManager_Remove_Entity(&GameState->EntityManager, Entity, "Dead");
       }
     }
   }
@@ -441,7 +469,7 @@ void SpawnEnemy(game_state* GameState, position_component Position)
 
   shoot_component Shoot = {};
   Shoot.TimeToShoot = GetNextShootTime(GameState->CommandBuffer.Time);
-  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type, &Shoot);
+  EntityManager_AddComponents(&GameState->EntityManager, Entity, Mask, 7, &Health, &Position, &Velocity, &Render, &Collider, &Type, &Shoot);
 }
 
 void RemoveOutOfBoundsUnits(game_state* GameState)
@@ -450,7 +478,7 @@ void RemoveOutOfBoundsUnits(game_state* GameState)
 
   vec2f        ScreenExtents = V2f(GameState->ScreenWidth * 0.5f, GameState->ScreenHeight * 0.5f);
   vec2f        ScreenCenter  = V2f(GameState->ScreenWidth * 0.5f, GameState->ScreenHeight * 0.5f);
-  for (u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
+  for (s32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
     entity              Entity   = Query.Ids[QueryIndex];
     position_component* Position = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
@@ -458,7 +486,7 @@ void RemoveOutOfBoundsUnits(game_state* GameState)
     type_component    * Type     = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, TYPE_ID);
     if (Type->Type != EntityType_Enemy && !Collision_Rect_Rect(ScreenExtents, ScreenCenter, Collider->Extents, V2f(Position->X, Position->Y)))
     {
-      EntityManager_Remove_Entity(&GameState->EntityManager, Entity);
+      EntityManager_Remove_Entity(&GameState->EntityManager, Entity, "Out of bounds!");
     }
   }
 }
@@ -469,7 +497,7 @@ position_component GetRandomEnemySpawnPosition(game_state* GameState)
   Result.X                  = GameState->ScreenWidth * 0.5f;
   Result.Y                  = rand() / (f32)RAND_MAX * GameState->ScreenHeight * 0.25f;
 
-  Result.Rotation           = (rand() / (f32)RAND_MAX * PI) - PI / 2;
+  Result.Rotation           = 0; // (rand() / (f32)RAND_MAX * PI) - PI / 2;
 
   return Result;
 }
@@ -488,7 +516,7 @@ void RespawnOutOfBoundsEnemies(game_state* GameState)
     {
       position_component* Position = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
 
-      if (Position->Y + Collider->Extents.Y > GameState->ScreenHeight)
+      if (Position->Y - Collider->Extents.Y > GameState->ScreenHeight)
       {
         position_component SpawnPosition = GetRandomEnemySpawnPosition(GameState);
         *Position                        = SpawnPosition;
@@ -606,12 +634,13 @@ void RenderHealth(game_state * GameState, pushbuffer * Pushbuffer)
 
 void HandleEnemyShooting(game_state * GameState)
 {
-  query_result Query = EntityManager_Query(&GameState->EntityManager, SHOOT_MASK);
-  for(u32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
+  query_result Query = EntityManager_Query(&GameState->EntityManager, SHOOT_MASK | TYPE_MASK);
+  for(s32 QueryIndex = 0; QueryIndex < Query.Count; QueryIndex++)
   {
     entity Entity         = Query.Ids[QueryIndex];
     shoot_component *Shoot = (shoot_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, SHOOT_ID);
-    if(Shoot->TimeToShoot <= GameState->CommandBuffer.Time)
+    type_component * Type = (type_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, TYPE_ID);
+    if(Shoot->TimeToShoot <= GameState->CommandBuffer.Time && Type->Type == EntityType_Enemy)
     {
       position_component * EnemyPosition = (position_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, POSITION_ID);
 
@@ -645,6 +674,8 @@ void HandleEnemyShooting(game_state * GameState)
     }
   }
 }
+
+
 
 GAME_UPDATE(GameUpdate)
 {
@@ -690,13 +721,11 @@ GAME_UPDATE(GameUpdate)
   CollisionDetection(GameState, Pushbuffer);
   CleanupEntities(GameState);
 
+  WriteSound(GameState, Audio);
   RenderObjects(GameState, Pushbuffer);
   {
     Assert(GameState->CommandBuffer.Time >= 0);
   }
   RenderHealth(GameState, Pushbuffer);
-
-
-
 
 }

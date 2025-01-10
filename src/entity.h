@@ -73,7 +73,7 @@ typedef struct shoot_component
 
 typedef struct query_result
 {
-  u32  Count;
+  s32  Count;
   u32* Ids;
 } query_result;
 
