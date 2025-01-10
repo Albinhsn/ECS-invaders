@@ -1,0 +1,2 @@
+../assets/laserSmall_000.wav shoot
+../assets/explosionCrunch_000.wav explosion

@@ -36,6 +36,8 @@ struct texture_node
   const char*   Name;
 };
 
+#define MAX_SOUND_COUNT 16
+#define MAX_PLAYING_SOUND_COUNT 16
 typedef struct game_state
 {
   arena           PermanentArena;
@@ -51,10 +53,10 @@ typedef struct game_state
   vec2f           PlayerPosition;
   f32             Score;
 
-  playing_sound PlayingSounds[16];
+  playing_sound PlayingSounds[MAX_PLAYING_SOUND_COUNT];
   u32 PlayingSoundCount;
-  sound Sounds[16];
-  u32 SoundsCount;
+  sound Sounds[MAX_SOUND_COUNT];
+  u32 SoundCount;
 
 } game_state;
 

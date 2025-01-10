@@ -11,6 +11,6 @@ call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliar
 del *.pdb > NUL 2> NUL
 del *.rdi > NUL 2> NUL
 REM 64-bit build
-cl %CommonCompilerFlags%  ..\src\invaders.c -Fminvaders.map -LD /link -incremental:no -opt:ref -PDB:invaders_%random%.pdb -EXPORT:GameUpdate
+cl %CommonCompilerFlags%  ..\src\invaders.c -Fminvaders.map -LD /link %CommonLinkerFlags% -incremental:no -opt:ref -PDB:invaders_%random%.pdb -EXPORT:GameUpdate -EXPORT:GameGetSoundSamples
 cl %CommonCompilerFlags% ..\src\win32_platform.c  /link %CommonLinkerFlags%
 popd

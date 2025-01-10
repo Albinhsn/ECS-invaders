@@ -57,6 +57,7 @@ typedef struct win32_software_renderer
 
 typedef struct win32_game_code{
   game_update * GameUpdate;
+  game_get_sound_samples * GameGetSoundSamples;
   void * Library;
 }win32_game_code;
 
@@ -64,16 +65,17 @@ typedef struct win32_thread{
     HANDLE Handle;
     DWORD Id;
 }win32_thread;
+
 typedef struct win32_audio
 {
   IMMDeviceEnumerator* Enumerator;
   IMMDevice*           Device;
   IAudioClient*        AudioClient;
-  IAudioRenderClient*  RenderClient;
+  IAudioRenderClient*          RenderClient;
   WAVEFORMATEXTENSIBLE*        WaveFormat;
-  u32                  BufferFrameCount;
-  HANDLE RefillEvent;
-  game_audio GameAudio;
+  u32                          BufferFrameCount;
+  HANDLE                       RefillEvent;
+  game_audio                   GameAudio;
 } win32_audio;
 
 #endif

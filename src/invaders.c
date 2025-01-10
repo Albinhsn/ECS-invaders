@@ -1,17 +1,12 @@
 #include "invaders.h"
 #include "entity.c"
 #include "image.c"
+#include "sound.c"
 #include "platform.h"
 #include "pushbuffer.c"
 #include "vector.c"
-#include <debugapi.h>
 
-void WriteSound(game_state *GameState, game_audio * Audio)
-{
-  // Iterate over playing sounds
-  //  If the sound is "over", then remove it from the list
 
-}
 
 void Inv_PlaySound(game_state * GameState, const char * SoundName)
 {
@@ -19,12 +14,12 @@ void Inv_PlaySound(game_state * GameState, const char * SoundName)
   // Add it to playing sounds
 }
 
-texture* GetTextureByName(game_state* GameState, u8* TextureName)
+texture* GetTextureByName(game_state* GameState, const char * TextureName)
 {
 
   string Name = {};
-  Name.Buffer = TextureName;
-  Name.Length = String_Length(TextureName);
+  Name.Buffer = (u8*)TextureName;
+  Name.Length = String_Length((u8*)TextureName);
   for (u32 TextureIndex = 0; TextureIndex < GameState->TextureCount; TextureIndex++)
   {
     string n = GameState->Textures[TextureIndex].Name;
@@ -33,7 +28,25 @@ texture* GetTextureByName(game_state* GameState, u8* TextureName)
       return &GameState->Textures[TextureIndex];
     }
   }
+  Assert(0 && "Couldn't find the texture!");
+  return 0;
+}
 
+sound * GetSoundByName(game_state * GameState, const char * SoundName)
+{
+  string Name = {};
+  Name.Buffer = (u8*)SoundName;
+  Name.Length = String_Length(Name.Buffer);
+  for(u32 SoundIndex = 0; SoundIndex < GameState->SoundCount; SoundIndex++)
+  {
+    sound * Sound = GameState->Sounds + SoundIndex;
+
+    if(String_Compare(&Name, &Sound->Name))
+    {
+      return Sound;
+    }
+  }
+  Assert(0 && "Couldn't find the sound!");
   return 0;
 }
 
@@ -106,6 +119,74 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
   }
 }
 
+void LoadSounds(game_state * GameState, game_memory * Memory)
+{
+  const char* SoundLocation = "../assets/sounds.txt";
+
+  u8*         SoundLocationBuffer;
+  u32         SoundLocationSize;
+  Memory->ReadFile(&GameState->PermanentArena, SoundLocation, &SoundLocationBuffer, &SoundLocationSize);
+
+  u32 NumberOfSounds = 0;
+  for (u32 BufferIndex = 0; BufferIndex < SoundLocationSize; BufferIndex++)
+  {
+    if (SoundLocationBuffer[BufferIndex] == '\n')
+    {
+      NumberOfSounds++;
+    }
+  }
+
+  Assert(NumberOfSounds <= ArrayCount(GameState->Sounds) && "Too many sounds!");
+
+  GameState->SoundCount = NumberOfSounds;
+
+
+  u32 Offset              = 0;
+  u32 SoundIndex          = 0;
+  while (Offset < SoundLocationSize)
+  {
+    u32 StartOfSoundLocation = Offset;
+    while (Offset < SoundLocationSize && SoundLocationBuffer[Offset] != ' ')
+    {
+      Offset++;
+    }
+    u8 c                          = SoundLocationBuffer[Offset];
+    SoundLocationBuffer[Offset] = '\0';
+    u8*  SoundBuffer            = 0;
+    u32  SoundBufferSize        = 0;
+    bool Result                   = Memory->ReadFile(&GameState->PermanentArena, (const char*)&SoundLocationBuffer[StartOfSoundLocation], &SoundBuffer, &SoundBufferSize);
+    if (Result == false)
+    {
+      Assert(0 && "Failed to read sound!")
+    }
+
+    Result = Sound_ParseWave(&GameState->PermanentArena, &GameState->Sounds[SoundIndex], SoundBuffer, SoundBufferSize);
+    Assert(Result == true && "Failed to parse wav file?");
+
+    SoundLocationBuffer[Offset]            = c;
+    while (Offset < SoundLocationSize && SoundLocationBuffer[Offset] == ' ')
+    {
+      Offset++;
+    }
+
+    u32 StartOfSoundNameLocation = Offset;
+    while (Offset < SoundLocationSize && IsAlphaOrDigit(SoundLocationBuffer[Offset]))
+    {
+      Offset++;
+    }
+    GameState->Sounds[SoundIndex].Name.Buffer = &SoundLocationBuffer[StartOfSoundNameLocation];
+    GameState->Sounds[SoundIndex].Name.Length = Offset - StartOfSoundNameLocation;
+    Offset++;
+    SoundIndex++;
+
+    // Skip until next letter
+    while (Offset < SoundLocationSize && (SoundLocationBuffer[Offset] == ' ' || SoundLocationBuffer[Offset] == '\n'))
+    {
+      Offset++;
+    }
+  }
+}
+
 void RenderObjects(game_state* GameState, pushbuffer* Pushbuffer)
 {
 
@@ -153,8 +234,8 @@ void CreatePlayer(game_state* GameState)
   Position.Rotation                    = 0;
   velocity_component Velocity          = {};
   render_component   Render            = {};
-  const char*        PlayerTextureName = "spaceShips1";
-  Render.Texture                       = GetTextureByName(GameState, (u8*)PlayerTextureName);
+
+  Render.Texture                       = GetTextureByName(GameState, "spaceShips1");
   Render.Alpha                         = 1;
   Render.FlippedZ                      = true;
   collider_component Collider          = {};
@@ -211,8 +292,8 @@ void UseInput(game_state* GameState, game_input* Input)
     Position.Y -= 40.0f;
     render_component Render     = {};
     Render.Alpha                = 1.0f;
-    const char* TextureName     = "spaceMissiles2";
-    Render.Texture              = GetTextureByName(GameState, (u8*)TextureName);
+
+    Render.Texture              = GetTextureByName(GameState, "spaceMissiles2");
     Render.FlippedZ             = false;
     velocity_component Velocity = {};
     Velocity.Y                  = -200.0f;
@@ -456,8 +537,8 @@ void SpawnEnemy(game_state* GameState, position_component Position)
   health_component Health      = {};
   Health.Health                = 1;
   render_component Render      = {};
-  const char*      TextureName = "spaceShips2";
-  Render.Texture               = GetTextureByName(GameState, (u8*)TextureName);
+
+  Render.Texture               = GetTextureByName(GameState, "spaceShips2");
   Render.FlippedZ              = false;
   collider_component Collider  = {};
   Collider.Extents             = V2f(Render.Texture->Width * 0.5f, Render.Texture->Height * 0.5f);
@@ -601,11 +682,9 @@ void RenderHealth(game_state * GameState, pushbuffer * Pushbuffer)
   f32 X = 25, Y = 25;
   f32 XOffset = 30;
 
-  const char * FilledHeartTextureName = "filledHeart";
-  texture * FilledHeartTexture = GetTextureByName(GameState, (u8*)FilledHeartTextureName);
 
-  const char * UnfilledHeartTextureName = "unfilledHeart";
-  texture * UnfilledHeartTexture = GetTextureByName(GameState, (u8*)UnfilledHeartTextureName);
+  texture * FilledHeartTexture = GetTextureByName(GameState, "filledHeart");
+  texture * UnfilledHeartTexture = GetTextureByName(GameState, "unfilledHeart");
 
   // ToDo find somewhere else?
   s32 MaxHealth = 3;
@@ -659,8 +738,8 @@ void HandleEnemyShooting(game_state * GameState)
 
       render_component Render     = {};
       Render.Alpha                = 1.0f;
-      const char* TextureName     = "spaceMissiles2";
-      Render.Texture              = GetTextureByName(GameState, (u8*)TextureName);
+
+      Render.Texture              = GetTextureByName(GameState, "spaceMissiles2");
       Render.FlippedZ             = true;
       velocity_component Velocity = {};
       Velocity.Y                  = 400.0f;
@@ -704,7 +783,7 @@ GAME_UPDATE(GameUpdate)
     CommandBuffer_PushDecideSpawn(&GameState->CommandBuffer, 0, 2);
 
     LoadTextures(GameState, Memory);
-
+    LoadSounds(GameState, Memory);
     EntityManager_Create(&GameState->PermanentArena, &GameState->EntityManager, 256, 7, sizeof(health_component), sizeof(position_component), sizeof(velocity_component), sizeof(render_component),
                          sizeof(collider_component), sizeof(type_component), sizeof(shoot_component));
     CreatePlayer(GameState);
@@ -721,11 +800,33 @@ GAME_UPDATE(GameUpdate)
   CollisionDetection(GameState, Pushbuffer);
   CleanupEntities(GameState);
 
-  WriteSound(GameState, Audio);
+
   RenderObjects(GameState, Pushbuffer);
-  {
-    Assert(GameState->CommandBuffer.Time >= 0);
-  }
   RenderHealth(GameState, Pushbuffer);
 
 }
+
+
+
+GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
+{
+  game_state* GameState = (game_state*)Memory->PermanentStorage;
+
+  // Just write any sound into here now
+  #if 0
+  u32 SamplesInBuffer = Audio->SampleFrameCount * Audio->Channels;
+  for(u32 SoundIndex = 0; SoundIndex < GameState->PlayingSoundCount; SoundIndex++)
+  {
+    //  If the sound is "over", then remove it from the list
+    playing_sound * Sound = GameState->PlayingSounds + SoundIndex;
+
+    u32 SamplesRemaining = Sound->Sound->SampleFrameCount * Sound->Sound->Channels  - Sound->SampleFramesPlayed;
+
+    for(u32 SampleIndex = 0; SampleIndex < Audio->SamplesToWrite; SampleIndex++)
+    {
+
+    }
+  }
+  #endif
+}
+

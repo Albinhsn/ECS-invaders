@@ -1,5 +1,7 @@
 #include "sound.h"
-#include "winsock.h"
+
+#include <winsock.h>
+#include <limits.h>
 
 typedef struct file_buffer{
   u8 * Buffer;
@@ -45,6 +47,7 @@ u16 FileBuffer_ParseU16(file_buffer * Buffer)
 
   return Result;
 }
+
 u8 FileBuffer_ParseU8(file_buffer * Buffer)
 {
   Assert(Buffer->Index + sizeof(u8) <= Buffer->Length);
@@ -115,10 +118,11 @@ bool Sound_ParseWave(arena * Arena, sound * Sound, u8 * Buffer, u32 Length)
     // u8 IDAscii[4] = {A,B,C,D};
     u32 ChunkSize   = FileBuffer_ParseU32(&FileBuffer);
     if(ID == DATA){
-      NotFoundData = false;
+      NotFoundData            = false;
       Sound->SampleFrameCount = ChunkSize / (Sound->BitsPerSample / 8  * Sound->Channels);
-      Sound->Samples = (f32*)Arena_Allocate(Arena, Sound->SampleFrameCount * Sound->Channels * sizeof(f32));
-      for(u32 SampleIndex = 0; SampleIndex < Sound->SampleFrameCount * Sound->Channels; SampleIndex++)
+      u32 SampleCount         = Sound->SampleFrameCount * Sound->Channels;
+      Sound->Samples          = (f32*)Arena_Allocate(Arena,  SampleCount * sizeof(f32));
+      for(u32 SampleIndex = 0; SampleIndex < SampleCount; SampleIndex++)
       {
         switch(Sound->BitsPerSample)
         {
@@ -127,6 +131,13 @@ bool Sound_ParseWave(arena * Arena, sound * Sound, u8 * Buffer, u32 Length)
             s32 Sample = FileBuffer_ParseS24(&FileBuffer);
             f32 SampleF32 = Sample /(f32)(1 << 23);
             Sound->Samples[SampleIndex] =SampleF32;
+            break;
+          }
+          case 16:
+          {
+            s16 Sample = FileBuffer_ParseU16(&FileBuffer);
+            f32 SampleF32 = Sample /(f32)(SHRT_MAX);
+            Sound->Samples[SampleIndex] = SampleF32;
             break;
           }
           default:{

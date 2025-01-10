@@ -1,5 +1,5 @@
 #ifndef SOUND_H
-
+#define SOUND_H
 #include "common.h"
 
 typedef struct sound
@@ -17,9 +17,10 @@ typedef struct sound
 
 typedef struct playing_sound
 {
-  f32 Volume;
   sound* Sound;
-  u32 SamplesPlayed;
+  f32 Volume;
+  u32 SampleFramesPlayed;
+  bool Looping;
 } playing_sound;
 
 #endif

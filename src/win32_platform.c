@@ -7,9 +7,10 @@
 #include "win32_platform.h"
 #include "sound.c"
 
-static u16                     GlobalScreenWidth  = 600;
-static u16                     GlobalScreenHeight = 800;
-static s32                     GlobalShouldQuit   = 0;
+static u16                     GlobalScreenWidth       = 600;
+static u16                     GlobalScreenHeight      = 800;
+static s32                     GlobalShouldQuit        = 0;
+static u16                     GlobalFramerateTargetMS = 30;
 static s64                     GlobalPerfCountFrequency;
 
 static win32_software_renderer GlobalRenderer;
@@ -82,6 +83,9 @@ void Win32_LoadGameCode(win32_game_code* GameCode)
   void* UpdateAddress  = Win32_GetProcAddress(GameCodeDLL, "GameUpdate");
   GameCode->Library    = GameCodeDLL;
   GameCode->GameUpdate = (game_update*)UpdateAddress;
+
+  UpdateAddress  = Win32_GetProcAddress(GameCodeDLL, "GameGetSoundSamples");
+  GameCode->GameGetSoundSamples = (game_get_sound_samples*)UpdateAddress;
 }
 
 void Win32_RenderFramebuffer(HWND hwnd)
@@ -240,7 +244,7 @@ bool Win32_ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Si
   return true;
 }
 
-bool Win32_InitAudio()
+bool Win32_InitAudio(arena * Arena)
 {
   HRESULT Result;
 
@@ -297,9 +301,10 @@ bool Win32_InitAudio()
   GlobalAudio.WaveFormat = (WAVEFORMATEXTENSIBLE*)WaveFormat;
   Assert(GlobalAudio.WaveFormat->Format.wFormatTag == 0xFFFE); // Is extended format
   Assert(GlobalAudio.WaveFormat->SubFormat.Data1 == 3); // Is floating point
+  Assert(GlobalAudio.WaveFormat->Format.nChannels == 2);
 
   // Initialize audio stream
-  REFERENCE_TIME BufferDuration   = 30 * 1000; // 30 ms
+  REFERENCE_TIME BufferDuration   = GlobalFramerateTargetMS * 1000; // 33 ms? expressed in 100-nanosecond units.
   u32            AudioClientFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST;
   Result                          = GlobalAudio.AudioClient->lpVtbl->Initialize(GlobalAudio.AudioClient,
                                                                                 AUDCLNT_SHAREMODE_SHARED, // Shared mode or exclusive
@@ -345,6 +350,7 @@ bool Win32_InitAudio()
   }
 
   // Set the data buffer to silent first
+  // ToDo Does this actually do something?
   u8* Data = 0;
   Result   = GlobalAudio.RenderClient->lpVtbl->GetBuffer(GlobalAudio.RenderClient, GlobalAudio.BufferFrameCount, &Data);
   if (FAILED(Result))
@@ -352,6 +358,7 @@ bool Win32_InitAudio()
     OutputDebugStringA("Failed to get the buffer!\n");
     return false;
   }
+
   Result = GlobalAudio.RenderClient->lpVtbl->ReleaseBuffer(GlobalAudio.RenderClient, GlobalAudio.BufferFrameCount, AUDCLNT_BUFFERFLAGS_SILENT);
   if (FAILED(Result))
   {
@@ -360,6 +367,15 @@ bool Win32_InitAudio()
   }
 
   game_audio * GameAudio = &GlobalAudio.GameAudio;
+  GameAudio->Channels = GlobalAudio.WaveFormat->Format.nChannels;
+
+  u32 NumberOfBuffers                 = 2;
+  // Always write one frame worth of buffer
+  GameAudio->SampleFramesToWrite           = GlobalAudio.WaveFormat->Format.nSamplesPerSec / GlobalFramerateTargetMS;
+  GameAudio->SampleFrameCount         = GameAudio->SampleFramesToWrite * NumberOfBuffers;
+  GameAudio->SampleIndexAudioThread   = 0;
+  GameAudio->SampleIndexGameCode      = 0;
+  GameAudio->Buffer = (f32*)Arena_Allocate(Arena, sizeof(f32) * GameAudio->SampleFrameCount * GameAudio->Channels);
 
   return true;
 }
@@ -425,7 +441,7 @@ DWORD Win32_AudioThread_Main(void* Data)
       u32 BufferSpaceAvailable = 0;
       Result = GlobalAudio.AudioClient->lpVtbl->GetCurrentPadding(GlobalAudio.AudioClient, &BufferSpaceAvailable);
       if(Result == AUDCLNT_E_DEVICE_INVALIDATED){
-        // Handle invalid device
+        // ToDo Handle invalid device
       }
 
       u32 SampleCount = GlobalAudio.BufferFrameCount - BufferSpaceAvailable;
@@ -435,15 +451,21 @@ DWORD Win32_AudioThread_Main(void* Data)
 
         // Here we write into the sound buffer
         // We assume this is floating point still!
-        f32 * Samples = (f32*)BufferData;
-        u32 SamplesPerSecond = GlobalAudio.WaveFormat->Format.nSamplesPerSec;
-        #if 0
-        Win32_OutputTestSound(SampleCount, Samples, 0.2f);
-        #elif 0
-        Win32_OutputSineWave(SamplesPerSecond, SampleCount, Samples, 440, 0.5);
-        #else
 
-        #endif
+
+        f32 * Samples = (f32*)BufferData;
+        game_audio * GameAudio = &GlobalAudio.GameAudio;
+        u32 SamplesInBuffer = GameAudio->SampleFrameCount * GameAudio->Channels;
+        for(u32 SampleToWriteIndex = 0; SampleToWriteIndex < SampleCount; SampleToWriteIndex++)
+        {
+
+          Assert(GameAudio->Channels == 2);
+          *Samples++ = *(GameAudio->Buffer + GameAudio->SampleIndexAudioThread++);
+          *Samples++ = *(GameAudio->Buffer + GameAudio->SampleIndexAudioThread++);
+          GameAudio->SampleIndexAudioThread %= SamplesInBuffer;
+        }
+
+
 
         Result = GlobalAudio.RenderClient->lpVtbl->ReleaseBuffer(GlobalAudio.RenderClient, SampleCount, 0);
 
@@ -522,31 +544,24 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
 
 
-  #if 0
-  #if 1
-  u8 * SoundBuffer = 0;
-  u32 SoundBufferSize = 0;
-  bool SoundResult = Win32_ReadFile(&GameArena, "../assets/UpdatedFOTTER.wav", &SoundBuffer, &SoundBufferSize);
-  sound Sound = {};
-  Sound_ParseWave(&GameArena, &Sound, SoundBuffer, SoundBufferSize);
-  GlobalSound = Sound;
-  #endif
 
-  bool InitializedAudio = Win32_InitAudio();
+
+  bool InitializedAudio = Win32_InitAudio(&GameArena);
   if (!InitializedAudio)
   {
     OutputDebugStringA("Failed to init Audio!\n");
   }
 
   // Run a separate thread for audio
+  #if 0
   GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
   SetThreadPriority(GlobalAudioThread.Handle, THREAD_PRIORITY_TIME_CRITICAL);
-
+  #endif
   if (GlobalAudioThread.Handle == 0)
   {
     OutputDebugStringA("Failed to create audio thread!\n");
   }
-  #endif
+
 
   win32_game_code GameCode = {};
   Win32_LoadGameCode(&GameCode);
@@ -567,10 +582,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   game_input    GameInput         = {};
 
   LARGE_INTEGER PreviousTimer     = Win32_GetTimeInSeconds();
-  u32           TargetFrameTimeMS = 33;
+
 
   GameMemory.ReadFile             = Win32_ReadFile;
-  f32 DeltaTime                   = TargetFrameTimeMS / 1000.0f;
+  f32 DeltaTime                   = GlobalFramerateTargetMS / 1000.0f;
   while (!GlobalShouldQuit)
   {
     if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath))
@@ -581,11 +596,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     Win32_ProcessMessages(&GameInput);
 
-    DeltaTime = Min(DeltaTime, 1.0f / 30.0f);
+    DeltaTime = Min(DeltaTime, 1.0f / GlobalFramerateTargetMS);
     GameMemory.DeltaTime    = DeltaTime;
     GameMemory.ScreenWidth  = GlobalScreenWidth;
     GameMemory.ScreenHeight = GlobalScreenHeight;
-    GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer, &GlobalAudio.GameAudio);
+    GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
+    if(GameCode.GameGetSoundSamples)
+    {
+      GameCode.GameGetSoundSamples(&GameMemory, &GlobalAudio.GameAudio);
+    }
+
 
     Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);
     Pushbuffer_Reset(&Pushbuffer);
@@ -599,10 +619,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     sprintf_s(FrameTimeBuf, ArrayCount(FrameTimeBuf), "Frame: %.4f\n", FrameTimeMSF);
     // OutputDebugStringA(FrameTimeBuf);
 
-    if (FrameTimeMS < TargetFrameTimeMS)
+    if (FrameTimeMS < GlobalFramerateTargetMS)
     {
-      u32 TimeToSleep = TargetFrameTimeMS - FrameTimeMS;
-      DeltaTime       = 1.0f / 30.0f;
+      u32 TimeToSleep = GlobalFramerateTargetMS - FrameTimeMS;
+      DeltaTime       = 1.0f / GlobalFramerateTargetMS;
       Sleep(TimeToSleep);
     }
     else
