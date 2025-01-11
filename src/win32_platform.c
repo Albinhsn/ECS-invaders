@@ -1,9 +1,9 @@
 #include "common.h"
-
+#include "math.h"
 #include <windows.h>
 
 #include "image.c"
-#include "renderer_software.c"
+#include "pushbuffer.c"
 #include "win32_platform.h"
 #include "sound.c"
 
@@ -20,9 +20,9 @@ static const char*             GlobalRenderCodeTempPath    = "../build/lock1.tmp
 static const char*             GlobalGameCodePath = "../build/invaders.dll";
 
 #if RENDERER_SOFTWARE
-static const char*             GlobalRenderCodePath = "../build/win32_software_renderer.dll";
-#else
-
+static const char*             GlobalRenderCodePath = "../build/win32_renderer_gl.dll";
+#elif RENDERER_GL
+static const char*             GlobalRenderCodePath = "../build/win32_renderer_gl.dll";
 #endif
 static win32_thread            GlobalAudioThread;
 static win32_audio             GlobalAudio;

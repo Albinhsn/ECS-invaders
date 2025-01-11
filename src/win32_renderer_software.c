@@ -1,6 +1,6 @@
 #include "common.h"
 #include "platform.h"
-#include "win32_software_renderer.h"
+#include "win32_renderer_software.h"
 #include "renderer_software.c"
 
 void Win32_Deallocate(void* Memory, u64 Size)

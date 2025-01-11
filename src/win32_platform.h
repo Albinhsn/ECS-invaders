@@ -2,7 +2,7 @@
 #ifndef WIN32_PLATFORM_H
 #define WIN32_PLATFORM_H
 
-#include "renderer_software.h"
+
 #include "platform.h"
 #include <audioclient.h>
 #include <combaseapi.h>
@@ -49,11 +49,6 @@ const IID IID_ISimpleAudioVolume = {
     0x87ce5498, 0x68d6, 0x44e5,{ 0x92, 0x15, 0x6d, 0xa4, 0x7e, 0xf8, 0x83, 0xd8 }
 };
 
-typedef struct win32_software_renderer
-{
-  software_renderer Renderer;
-  BITMAPINFO Info;
-} win32_software_renderer;
 
 typedef struct win32_game_code{
   game_update * GameUpdate;

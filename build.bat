@@ -12,7 +12,8 @@ del *.pdb > NUL 2> NUL
 del *.rdi > NUL 2> NUL
 REM 64-bit build
 cl %CommonCompilerFlags%  ..\src\invaders.c -Fminvaders.map -LD /link %CommonLinkerFlags% -incremental:no -opt:ref -PDB:invaders_%random%.pdb -EXPORT:GameUpdate -EXPORT:GameGetSoundSamples
-cl %CommonCompilerFlags%  ..\src\win32_software_renderer.c -Fmsoftware_renderer.map -LD /link %CommonLinkerFlags% -incremental:no -opt:ref -PDB:win32_software_renderer_%random%.pdb -EXPORT:ReleaseRenderer -EXPORT:BeginFrame -EXPORT:CreateRenderer -EXPORT:EndFrame
+cl %CommonCompilerFlags%  ..\src\win32_renderer_software.c -Fmwin32_renderer_software.map -LD /link %CommonLinkerFlags% -incremental:no -opt:ref -PDB:win32_software_renderer_%random%.pdb -EXPORT:ReleaseRenderer -EXPORT:BeginFrame -EXPORT:CreateRenderer -EXPORT:EndFrame
+cl %CommonCompilerFlags%  ..\src\win32_renderer_gl.c -Fmwin32_renderer_software.map -LD /link %CommonLinkerFlags% -incremental:no -opt:ref -PDB:win32_software_renderer_%random%.pdb -EXPORT:ReleaseRenderer -EXPORT:BeginFrame -EXPORT:CreateRenderer -EXPORT:EndFrame
 cl %CommonCompilerFlags% ..\src\win32_platform.c  /link %CommonLinkerFlags%
 
 popd

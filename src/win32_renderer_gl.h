@@ -1,0 +1,5 @@
+#ifndef WIN32_RENDERER_OPENGL
+#define WIN32_RENDERER_OPENGL
+
+
+#endif
