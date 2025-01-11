@@ -31,20 +31,9 @@ The ECS way is to create systems or components to solve things
 
 
 # ToDo
-* Get a handle of the timer stuff in win32
-  * Fix dt bug?
-* Support more of the WAV formats :)
-  * Try to use them like before with GlobalSound
-* Test Loading Game Sounds
-* Test looping a sound from gamecode
-* Create Inv_PlaySound
-* Test Sound mixer
 * Hoist and expand file_buffer
+* Reenable enemy spawning
 
-* Audio
-    * Every frame we write 33 ms (the next frame) of sound into a buffer
-      * I.e we need to do audio mixing every frame in the game code
-    * That buffer gets copied from on the audio thread
 
 * Draw Text
 * Render score

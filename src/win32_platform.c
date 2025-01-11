@@ -623,8 +623,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
 
     Win32_ProcessMessages(&GameInput);
+    if(GlobalShouldQuit)
+    {
+      break;
+    }
 
+    // Purely for debugging
     DeltaTime = Min(DeltaTime, 1.0f / GlobalFramerateTargetMS);
+
     GameMemory.DeltaTime    = DeltaTime;
     GameMemory.ScreenWidth  = GlobalScreenWidth;
     GameMemory.ScreenHeight = GlobalScreenHeight;
@@ -633,7 +639,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     {
       u32 SampleFramesToWrite           = GlobalAudio.BufferFrameCount;
       GameCode.GameGetSoundSamples(&GameMemory, &GlobalAudio.GameAudio, SampleFramesToWrite);
-
     }
 
 
@@ -647,7 +652,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     if (FrameMinusSleep < GlobalFramerateTargetMS)
     {
-
       f32 TargetSleepTime = GlobalFramerateTargetMS - SleepError;
       f32 TimeToSleep = TargetSleepTime - FrameMinusSleep;
       DeltaTime       = 1.0f / GlobalFramerateTargetMS;

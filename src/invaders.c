@@ -6,12 +6,36 @@
 #include "pushbuffer.c"
 #include "vector.c"
 
+sound * GetSoundByName(game_state * GameState, const char * SoundName)
+{
+  string Name = {};
+  Name.Buffer = (u8*)SoundName;
+  Name.Length = String_Length(Name.Buffer);
+  for(u32 SoundIndex = 0; SoundIndex < GameState->SoundCount; SoundIndex++)
+  {
+    sound * Sound = GameState->Sounds + SoundIndex;
 
+    if(String_Compare(&Name, &Sound->Name))
+    {
+      return Sound;
+    }
+  }
+  Assert(0 && "Couldn't find the sound!");
+  return 0;
+}
 
 void Inv_PlaySound(game_state * GameState, const char * SoundName)
 {
-  // Find the sound
-  // Add it to playing sounds
+  sound * Sound = GetSoundByName(GameState, SoundName);
+  Assert(Sound && "Didn't find this sound!");
+  Assert(GameState->PlayingSoundCount + 1 < ArrayCount(GameState->PlayingSounds));
+
+  playing_sound * PlayingSound = &GameState->PlayingSounds[GameState->PlayingSoundCount++];
+  PlayingSound->Sound = Sound;
+  PlayingSound->Looping = false;
+  PlayingSound->Volume = 0.1f;
+  PlayingSound->SampleFramesPlayed = 0;
+
 }
 
 texture* GetTextureByName(game_state* GameState, const char * TextureName)
@@ -32,23 +56,7 @@ texture* GetTextureByName(game_state* GameState, const char * TextureName)
   return 0;
 }
 
-sound * GetSoundByName(game_state * GameState, const char * SoundName)
-{
-  string Name = {};
-  Name.Buffer = (u8*)SoundName;
-  Name.Length = String_Length(Name.Buffer);
-  for(u32 SoundIndex = 0; SoundIndex < GameState->SoundCount; SoundIndex++)
-  {
-    sound * Sound = GameState->Sounds + SoundIndex;
 
-    if(String_Compare(&Name, &Sound->Name))
-    {
-      return Sound;
-    }
-  }
-  Assert(0 && "Couldn't find the sound!");
-  return 0;
-}
 
 void LoadTextures(game_state* GameState, game_memory* Memory)
 {
@@ -286,7 +294,7 @@ void UseInput(game_state* GameState, game_input* Input)
 
   if (Input->Shoot && Shoot->TimeToShoot <= GameState->CommandBuffer.Time)
   {
-    u32                BulletMask = RENDER_MASK | POSITION_MASK | VELOCITY_MASK | COLLIDER_MASK | TYPE_MASK;
+    u32                BulletMask = RENDER_MASK | POSITION_MASK | VELOCITY_MASK | COLLIDER_MASK | TYPE_MASK | HEALTH_MASK;
     entity             Bullet     = EntityManager_Create_Entity(&GameState->EntityManager, BulletMask);
     position_component Position   = *PlayerPosition;
     Position.Y -= 40.0f;
@@ -301,12 +309,16 @@ void UseInput(game_state* GameState, game_input* Input)
     Collider.Extents.X = Render.Texture->Width * 0.5f;
     Collider.Extents.Y = Render.Texture->Height  * 0.5f;
 
+    health_component Health = {};
+    Health.Health = 1;
+
     type_component Type = {};
     Type.Type = EntityType_Bullet_Player;
-    EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 5, &Position, &Velocity, &Render, &Collider, &Type);
+    EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type);
 
     f32 ShootCooldown = 1.0f;
     Shoot->TimeToShoot = GameState->CommandBuffer.Time + ShootCooldown;
+    Inv_PlaySound(GameState, "shoot");
   }
 }
 
@@ -370,7 +382,7 @@ bool IsColliding(type_component * T0, collider_component* C0, position_component
     CanCollide = false;
   }
 
-  // This should be OBB!!!
+  // ToDo This should be OBB!!!
   return CanCollide && Collision_Rect_Rect(C0->Extents, V2f(P0->X, P0->Y), C1->Extents, V2f(P1->X, P1->Y));
 }
 
@@ -503,11 +515,12 @@ void CollisionDetection(game_state* GameState, pushbuffer * Pushbuffer)
 
 void RemoveDeadUnits(game_state* GameState)
 {
-  query_result Query = EntityManager_Query(&GameState->EntityManager, HEALTH_MASK);
+  query_result Query = EntityManager_Query(&GameState->EntityManager, HEALTH_MASK | TYPE_MASK);
   for (s32 EntityIndex = 0; EntityIndex < Query.Count; EntityIndex++)
   {
     entity            Entity = Query.Ids[EntityIndex];
     health_component* Health = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, HEALTH_ID);
+
     if (Health->Health <= 0)
     {
       if (Entity == GameState->PlayerEntity)
@@ -517,6 +530,11 @@ void RemoveDeadUnits(game_state* GameState)
       }
       else
       {
+        type_component* Type     = EntityManager_GetComponentFromEntity(&GameState->EntityManager, Entity, TYPE_ID);
+        if(Type->Type == EntityType_Enemy)
+        {
+          Inv_PlaySound(GameState, "explosion");
+        }
         EntityManager_Remove_Entity(&GameState->EntityManager, Entity, "Dead");
       }
     }
@@ -836,41 +854,64 @@ GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 {
   game_state* GameState = (game_state*)Memory->PermanentStorage;
 
-  Assert(GameState->SoundCount > 0);
-  sound *Sound = &GameState->Sounds[0];
-  Assert(Sound->Channels == 2);
-  Assert(Audio->Channels == 2);
+
+
   f32 * Buffer = Audio->Buffer;
-  u32 BufferSampleFrameIndex = Audio->SampleFrameIndexGameCode;
-  u32 Prev = BufferSampleFrameIndex;
-  f32 Volume = 0.1f;
-
-  static u32 SampleFramesPlayed = 0;
-  u32 PrevSampleFrames = SampleFramesPlayed;
-  char          Buf[1024] = {};
-  sprintf_s(Buf, ArrayCount(Buf), "Game Thread Starting %d\n", Audio->SampleFrameIndexGameCode);
-  OutputDebugStringA(Buf);
-
+  u32 BufferSampleFrameIndex = 0;
   for(u32 SampleFrameIndex = 0; SampleFrameIndex < SampleFramesToWrite; SampleFrameIndex++)
   {
-    Buffer[BufferSampleFrameIndex * 2 + 0] = Sound->Samples[SampleFramesPlayed * 2 + 0] * Volume;
-    Buffer[BufferSampleFrameIndex * 2 + 1] = Sound->Samples[SampleFramesPlayed * 2 + 1] * Volume;
+    Buffer[((Audio->SampleFrameIndexGameCode + SampleFrameIndex) % Audio->SampleFrameCount)* 2 + 0] = 0;
+    Buffer[((Audio->SampleFrameIndexGameCode + SampleFrameIndex) % Audio->SampleFrameCount)* 2 + 1] = 0;
+  }
+  f32 Volume = 0.1f;
 
-    SampleFramesPlayed++;
-    SampleFramesPlayed %= Sound->SampleFrameCount;
+  for(s32 PlayingSoundIndex = GameState->PlayingSoundCount - 1; PlayingSoundIndex >= 0; PlayingSoundIndex--)
+  {
+    u32 BufferSampleFrameIndex = Audio->SampleFrameIndexGameCode;
+    playing_sound * PlayingSound = &GameState->PlayingSounds[PlayingSoundIndex];
+    sound * Sound = PlayingSound->Sound;
 
-    BufferSampleFrameIndex++;
-    BufferSampleFrameIndex = BufferSampleFrameIndex % Audio->SampleFrameCount;
+    // ToDo looping!
+    u32 FramesRemaining = Sound->SampleFrameCount - PlayingSound->SampleFramesPlayed;
+    u32 FramesToWrite = FramesRemaining < SampleFramesToWrite ? FramesRemaining : SampleFramesToWrite;
+
+    for(u32 SampleFrameIndex = 0; SampleFrameIndex < FramesToWrite; SampleFrameIndex++)
+    {
+      switch(Sound->Channels)
+      {
+        case 1:
+        {
+          Buffer[BufferSampleFrameIndex * 2 + 0] += Sound->Samples[PlayingSound->SampleFramesPlayed] * Volume;
+          Buffer[BufferSampleFrameIndex * 2 + 1] += Sound->Samples[PlayingSound->SampleFramesPlayed] * Volume;
+          break;
+        }
+        case 2:
+        {
+          Buffer[BufferSampleFrameIndex * 2 + 0] += Sound->Samples[PlayingSound->SampleFramesPlayed * 2 + 0] * Volume;
+          Buffer[BufferSampleFrameIndex * 2 + 1] += Sound->Samples[PlayingSound->SampleFramesPlayed * 2 + 1] * Volume;
+          break;
+        }
+      }
+
+
+      Assert(PlayingSound->SampleFramesPlayed < Sound->SampleFrameCount);
+      PlayingSound->SampleFramesPlayed++;
+
+      BufferSampleFrameIndex++;
+      BufferSampleFrameIndex = BufferSampleFrameIndex % Audio->SampleFrameCount;
+    }
+
+    Assert(PlayingSound->SampleFramesPlayed <= Sound->SampleFrameCount);
+
+    if(PlayingSound->SampleFramesPlayed >= Sound->SampleFrameCount)
+    {
+      // ToDo 0 fill?
+      --GameState->PlayingSoundCount;
+      GameState->PlayingSounds[PlayingSoundIndex] = GameState->PlayingSounds[GameState->PlayingSoundCount];
+    }
   }
 
 
-  Audio->SampleFrameIndexGameCode = BufferSampleFrameIndex;
-
-  char          Buf2[1024] = {};
-  sprintf_s(Buf2, ArrayCount(Buf2), "Game Thread Ending %d\n", Audio->SampleFrameIndexGameCode);
-  OutputDebugStringA(Buf2);
-  
-
-
+  Audio->SampleFrameIndexGameCode = (Audio->SampleFrameIndexGameCode + SampleFramesToWrite) % Audio->SampleFrameCount;
 }
 
