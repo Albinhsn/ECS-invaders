@@ -97,7 +97,7 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
       Assert(0 && "Failed to read texture!")
     }
 
-    targa_image Image = {};
+    image Image = {};
     Image_LoadTarga(&GameState->PermanentArena, &Image, TextureBuffer, TextureBufferSize);
     GameState->Textures[TextureIndex].Memory = Image.Buffer;
     GameState->Textures[TextureIndex].Width  = Image.Width;

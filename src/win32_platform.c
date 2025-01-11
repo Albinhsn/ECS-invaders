@@ -586,6 +586,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
       }
   }
 
+
   win32_game_code GameCode = {};
   Win32_LoadGameCode(&GameCode);
   u64 GameCodeLastChanged = 0;
