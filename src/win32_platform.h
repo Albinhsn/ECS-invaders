@@ -61,6 +61,15 @@ typedef struct win32_game_code{
   void * Library;
 }win32_game_code;
 
+typedef struct win32_render_code
+{
+  renderer_begin_frame * BeginFrame;
+  renderer_end_frame * EndFrame;
+  renderer_create * Create;
+  renderer_release * Release;
+  void * Library;
+} win32_render_code;
+
 typedef struct win32_thread{
     HANDLE Handle;
     DWORD Id;

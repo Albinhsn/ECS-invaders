@@ -13,18 +13,31 @@ static s32                     GlobalShouldQuit        = 0;
 static u16                     GlobalFramerateTargetMS = 30;
 static s64                     GlobalPerfCountFrequency;
 
-static win32_software_renderer GlobalRenderer;
+
 
 static const char*             GlobalTempPath    = "../build/lock.tmp";
-static const char*             GlobalLibraryPath = "../build/invaders.dll";
+static const char*             GlobalRenderCodeTempPath    = "../build/lock1.tmp";
+static const char*             GlobalGameCodePath = "../build/invaders.dll";
+
+#if RENDERER_SOFTWARE
+static const char*             GlobalRenderCodePath = "../build/win32_software_renderer.dll";
+#else
+
+#endif
 static win32_thread            GlobalAudioThread;
 static win32_audio             GlobalAudio;
+
+void Win32_Deallocate(void* Memory, long Size)
+{
+  VirtualFree(Memory, Size, MEM_DECOMMIT);
+}
 
 static void*                   Win32_Allocate(u64 size)
 {
   // ToDo Align the memory?
   return VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 }
+
 u32 Win32_FileHasChanged(u64* FileLastChangedTimer, const char* Filename)
 {
 
@@ -43,17 +56,7 @@ u32 Win32_FileHasChanged(u64* FileLastChangedTimer, const char* Filename)
   return 0;
 }
 
-static void Win32_Create_Renderer(win32_software_renderer* Renderer, arena* GameMemory)
-{
-  void* Buffer = Arena_Allocate(GameMemory, sizeof(u32) * GlobalScreenWidth * GlobalScreenHeight);
-  Software_Renderer_Create(&Renderer->Renderer, Buffer, GlobalScreenWidth, GlobalScreenHeight);
-  Renderer->Info.bmiHeader.biSize        = sizeof(Renderer->Info.bmiHeader);
-  Renderer->Info.bmiHeader.biWidth       = Renderer->Renderer.Width;
-  Renderer->Info.bmiHeader.biHeight      = -Renderer->Renderer.Height;
-  Renderer->Info.bmiHeader.biPlanes      = 1;
-  Renderer->Info.bmiHeader.biBitCount    = 32;
-  Renderer->Info.bmiHeader.biCompression = BI_RGB;
-}
+
 
 void* Win32_LibraryLoad(const char* LibraryName)
 {
@@ -74,10 +77,34 @@ void Win32_FreeGameCode(win32_game_code* GameCode)
   GameCode->Library    = 0;
   GameCode->GameUpdate = 0;
 }
+
+void Win32_FreeRenderCode(win32_render_code * RenderCode, platform_renderer * PlatformRenderer){
+  RenderCode->Release(PlatformRenderer);
+}
+
+void Win32_LoadRenderCode(win32_render_code * RenderCode)
+{
+  CopyFile(GlobalRenderCodePath, GlobalRenderCodeTempPath, FALSE);
+  void* RenderCodeDLL    = Win32_LibraryLoad(GlobalRenderCodeTempPath);
+  RenderCode->Library    = RenderCodeDLL;
+
+  void* Address          = Win32_GetProcAddress(RenderCodeDLL, "BeginFrame");
+  RenderCode->BeginFrame = (renderer_begin_frame*)Address;
+
+  Address                = Win32_GetProcAddress(RenderCodeDLL, "EndFrame");
+  RenderCode->EndFrame   = (renderer_end_frame*)Address;
+
+  Address                = Win32_GetProcAddress(RenderCodeDLL, "CreateRenderer");
+  RenderCode->Create     = (renderer_create*)Address;
+
+  Address                = Win32_GetProcAddress(RenderCodeDLL, "ReleaseRenderer");
+  RenderCode->Release    = (renderer_release*)Address;
+}
+
 void Win32_LoadGameCode(win32_game_code* GameCode)
 {
 
-  CopyFile(GlobalLibraryPath, GlobalTempPath, FALSE);
+  CopyFile(GlobalGameCodePath, GlobalTempPath, FALSE);
   void* GameCodeDLL    = Win32_LibraryLoad(GlobalTempPath);
 
   void* UpdateAddress  = Win32_GetProcAddress(GameCodeDLL, "GameUpdate");
@@ -88,15 +115,7 @@ void Win32_LoadGameCode(win32_game_code* GameCode)
   GameCode->GameGetSoundSamples = (game_get_sound_samples*)UpdateAddress;
 }
 
-void Win32_RenderFramebuffer(HWND hwnd)
-{
 
-  HDC               hdc      = GetDC(hwnd);
-  software_renderer Renderer = GlobalRenderer.Renderer;
-
-  StretchDIBits(hdc, 0, 0, GlobalScreenWidth, GlobalScreenHeight, 0, 0, GlobalScreenWidth, GlobalScreenHeight, Renderer.Buffer, &GlobalRenderer.Info, DIB_RGB_COLORS, SRCCOPY);
-  ReleaseDC(hwnd, hdc);
-}
 
 static LRESULT CALLBACK Win32_WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -119,7 +138,7 @@ static LRESULT CALLBACK Win32_WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
     PAINTSTRUCT ps;
     HDC         hdc = BeginPaint(hwnd, &ps);
 
-    Win32_RenderFramebuffer(hwnd);
+    // Win32_RenderFramebuffer(hwnd);
 
     EndPaint(hwnd, &ps);
     return 0;
@@ -564,7 +583,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   arena GameArena      = {};
   Arena_Create(&GameArena, Memory, GameMemorySize);
 
-  Win32_Create_Renderer(&GlobalRenderer, &GameArena);
+   win32_game_code GameCode = {};
+  Win32_LoadGameCode(&GameCode);
+  u64 GameCodeLastChanged = 0;
+  Win32_FileHasChanged(&GameCodeLastChanged, "../build/invaders.dll");
+
+  win32_render_code RenderCode = {};
+  Win32_LoadRenderCode(&RenderCode);
+  platform_renderer * PlatformRenderer = RenderCode.Create(GlobalScreenWidth, GlobalScreenHeight, hwnd);
 
   LARGE_INTEGER PerfCountFrequencyResult;
   QueryPerformanceFrequency(&PerfCountFrequencyResult);
@@ -587,10 +613,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   }
 
 
-  win32_game_code GameCode = {};
-  Win32_LoadGameCode(&GameCode);
-  u64 GameCodeLastChanged = 0;
-  Win32_FileHasChanged(&GameCodeLastChanged, "../build/invaders.dll");
+
 
   pushbuffer Pushbuffer           = {};
   u64        PushbufferMemorySize = Megabyte(1);
@@ -617,7 +640,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   while (!GlobalShouldQuit)
   {
-    if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath))
+    RenderCode.BeginFrame(PlatformRenderer, &Pushbuffer);
+    if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalGameCodePath))
     {
       Win32_FreeGameCode(&GameCode);
       Win32_LoadGameCode(&GameCode);
@@ -643,9 +667,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
 
 
-    Software_Renderer_Render(&GlobalRenderer.Renderer, &Pushbuffer);
-    Pushbuffer_Reset(&Pushbuffer);
-    Win32_RenderFramebuffer(hwnd);
+    RenderCode.EndFrame(PlatformRenderer, &Pushbuffer);
 
     LARGE_INTEGER CurrentTimer       = Win32_GetTimeInSeconds();
 
@@ -692,7 +714,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   {
     OutputDebugStringA("Failed to kill thread? GL\n");
   }
-  // Win32_UninitAudio();
+  Win32_UninitAudio();
+  Win32_FreeGameCode(&GameCode);
+  Win32_FreeRenderCode(&RenderCode, PlatformRenderer);
 
   return 0;
 }

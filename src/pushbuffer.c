@@ -1,9 +1,9 @@
 #include "pushbuffer.h"
 #include "common.h"
 
-void Pushbuffer_CheckSpace(pushbuffer* Pushbuffer, u64 Size)
+void Pushbuffer_EntryCheckSpace(pushbuffer* Pushbuffer, u64 Size)
 {
-  if (Pushbuffer->AllocatedOffset + Size > Pushbuffer->Size)
+  if (Pushbuffer->AllocatedOffset + Size + sizeof(pushbuffer_entry_type) > Pushbuffer->Size)
   {
     Assert(0 && "Writing outside of the pushbuffer!");
   }
@@ -45,27 +45,27 @@ pushbuffer_entry_type Pushbuffer_ReadEntryType(pushbuffer* Pushbuffer)
 void Pushbuffer_PushRectColor(pushbuffer* Pushbuffer, vec2f Origin, vec2f XAxis, vec2f YAxis, u32 Color)
 {
 
-  Pushbuffer_CheckSpace(Pushbuffer, sizeof(pushbuffer_entry_rect_color));
+  Pushbuffer_EntryCheckSpace(Pushbuffer, sizeof(pushbuffer_entry_rect_color));
 
   pushbuffer_entry_rect_color Entry = {};
   Entry.Color                       = Color;
-  Entry.Origin                         = Origin;
-  Entry.XAxis                         = XAxis;
-  Entry.YAxis                         = YAxis;
+  Entry.Origin                      = Origin;
+  Entry.XAxis                       = XAxis;
+  Entry.YAxis                       = YAxis;
   Pushbuffer_Write(Pushbuffer, Pushbuffer_Entry_Rect_Color, pushbuffer_entry_type);
   Pushbuffer_Write(Pushbuffer, Entry, pushbuffer_entry_rect_color);
 }
-void Pushbuffer_PushRectTexture(pushbuffer* Pushbuffer, texture * Texture, vec2f Origin, vec2f XAxis, vec2f YAxis, bool FlippedZ)
+void Pushbuffer_PushRectTexture(pushbuffer* Pushbuffer, texture* Texture, vec2f Origin, vec2f XAxis, vec2f YAxis, bool FlippedZ)
 {
 
-  Pushbuffer_CheckSpace(Pushbuffer, sizeof(pushbuffer_entry_rect_texture));
+  Pushbuffer_EntryCheckSpace(Pushbuffer, sizeof(pushbuffer_entry_rect_texture));
   pushbuffer_entry_rect_texture Entry = {};
 
-  Entry.Texture = Texture;
-  Entry.Origin = Origin;
-  Entry.XAxis = XAxis;
-  Entry.YAxis = YAxis;
-  Entry.FlippedZ = FlippedZ;
+  Entry.Texture                       = Texture;
+  Entry.Origin                        = Origin;
+  Entry.XAxis                         = XAxis;
+  Entry.YAxis                         = YAxis;
+  Entry.FlippedZ                      = FlippedZ;
   Pushbuffer_Write(Pushbuffer, Pushbuffer_Entry_Rect_Texture, pushbuffer_entry_type);
   Pushbuffer_Write(Pushbuffer, Entry, pushbuffer_entry_rect_texture);
 }
@@ -73,10 +73,25 @@ void Pushbuffer_PushRectTexture(pushbuffer* Pushbuffer, texture * Texture, vec2f
 void Pushbuffer_PushClear(pushbuffer* Pushbuffer, u32 Color)
 {
 
-  Pushbuffer_CheckSpace(Pushbuffer, sizeof(pushbuffer_entry_clear));
+  Pushbuffer_EntryCheckSpace(Pushbuffer, sizeof(pushbuffer_entry_clear));
 
   pushbuffer_entry_clear Entry = {};
   Entry.Color                  = Color;
   Pushbuffer_Write(Pushbuffer, Pushbuffer_Entry_Clear, pushbuffer_entry_type);
   Pushbuffer_Write(Pushbuffer, Entry, pushbuffer_entry_clear);
+}
+
+void Pushbuffer_PushText(pushbuffer* Pushbuffer, string *Text, msdf_font* Font, ui_text_alignment Alignment, vec2f Position, u32 Size, u32 Color)
+{
+  Pushbuffer_EntryCheckSpace(Pushbuffer, sizeof(pushbuffer_entry_text));
+  Pushbuffer_Write(Pushbuffer, Pushbuffer_Entry_Text, pushbuffer_entry_type);
+  pushbuffer_entry_text Entry = {};
+  Entry.Text                  = Text;
+  Entry.Font                  = Font;
+  Entry.Size                  = Size;
+  Entry.Position              = Position;
+  Entry.Alignment             = Alignment;
+  Entry.Color                 = Color;
+
+  Pushbuffer_Write(Pushbuffer, Entry, pushbuffer_entry_text);
 }

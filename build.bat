@@ -1,6 +1,6 @@
 @echo off
 
-set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHa- -O0 -Oi -WX -W4 -wd4127 -wd4505 -wd4456 -wd4201 -wd4100 -wd4189 -FC -Z7
+set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHa- -O0 -Oi -WX -W4 -wd4127 -wd4505 -wd4456 -wd4201 -wd4100 -wd4189 -FC -Z7 -DRENDERER_SOFTWARE=1
 set CommonLinkerFlags= -opt:ref user32.lib gdi32.lib winmm.lib ole32.lib winmm.lib Ws2_32.lib
 
 IF NOT EXIST .\build mkdir .\build
@@ -12,5 +12,7 @@ del *.pdb > NUL 2> NUL
 del *.rdi > NUL 2> NUL
 REM 64-bit build
 cl %CommonCompilerFlags%  ..\src\invaders.c -Fminvaders.map -LD /link %CommonLinkerFlags% -incremental:no -opt:ref -PDB:invaders_%random%.pdb -EXPORT:GameUpdate -EXPORT:GameGetSoundSamples
+cl %CommonCompilerFlags%  ..\src\win32_software_renderer.c -Fmsoftware_renderer.map -LD /link %CommonLinkerFlags% -incremental:no -opt:ref -PDB:win32_software_renderer_%random%.pdb -EXPORT:ReleaseRenderer -EXPORT:BeginFrame -EXPORT:CreateRenderer -EXPORT:EndFrame
 cl %CommonCompilerFlags% ..\src\win32_platform.c  /link %CommonLinkerFlags%
+
 popd

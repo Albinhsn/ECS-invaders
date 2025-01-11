@@ -59,7 +59,7 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
 {
   const char* TextureLocation = "../assets/textures.txt";
 
-  file_buffer Buffer = {};
+  file_buffer Buffer          = {};
   Memory->ReadFile(&GameState->PermanentArena, TextureLocation, &Buffer.Buffer, &Buffer.Length);
 
   u32 NumberOfTextures = 0;
@@ -83,11 +83,11 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
       FileBuffer_Advance(&Buffer, 1);
     }
 
-    u8 c                          = FileBuffer_Current(&Buffer);
+    u8 c                        = FileBuffer_Current(&Buffer);
     Buffer.Buffer[Buffer.Index] = '\0';
 
-    file_buffer TextureBuffer = {};
-    bool Result                   = Memory->ReadFile(&GameState->PermanentArena, (const char*)&Buffer.Buffer[StartOfTextureLocation], &TextureBuffer.Buffer, &TextureBuffer.Length);
+    file_buffer TextureBuffer   = {};
+    bool        Result          = Memory->ReadFile(&GameState->PermanentArena, (const char*)&Buffer.Buffer[StartOfTextureLocation], &TextureBuffer.Buffer, &TextureBuffer.Length);
     if (Result == false)
     {
       Assert(0 && "Failed to read texture!")
@@ -99,8 +99,8 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
     GameState->Textures[TextureIndex].Width  = Image.Width;
     GameState->Textures[TextureIndex].Height = Image.Height;
 
-    Buffer.Buffer[Buffer.Index]            = c;
-    while (Buffer.Index< Buffer.Length && FileBuffer_Current(&Buffer) == ' ')
+    Buffer.Buffer[Buffer.Index]              = c;
+    while (Buffer.Index < Buffer.Length && FileBuffer_Current(&Buffer) == ' ')
     {
       FileBuffer_Advance(&Buffer, 1);
     }
@@ -123,14 +123,54 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
   }
 }
 
+void LoadFont(game_state *GameState, game_memory * Memory)
+{
+  const char * FontLocation = "../assets/font.txt";
+  file_buffer Buffer        = {};
+  Buffer.Index              = 0;
+  Memory->ReadFile(&GameState->PermanentArena, FontLocation, &Buffer.Buffer, &Buffer.Length);
+
+
+  msdf_font *Font = &GameState->Font;
+  while(FileBuffer_Current(&Buffer) != '\n')
+  {
+    FileBuffer_Advance(&Buffer, 1);
+  }
+
+  file_buffer FontBuffer = {};
+
+  u8 c = FileBuffer_Current(&Buffer);
+  Buffer.Buffer[Buffer.Index] = '\0';
+  bool Result = Memory->ReadFile(&GameState->PermanentArena, (const char*)Buffer.Buffer, &FontBuffer.Buffer, &FontBuffer.Length);
+  Assert(Result == true);
+
+
+
+  Image_LoadBMP(&GameState->PermanentArena, &Font->Image, FontBuffer.Buffer, FontBuffer.Length);
+
+  FileBuffer_Advance(&Buffer, 1);
+
+
+  Font->WidthPerCell = (u16)FileBuffer_ParseInt(&Buffer);
+  FileBuffer_Advance(&Buffer, 1);
+  Font->HeightPerCell = (u16)FileBuffer_ParseInt(&Buffer);
+  FileBuffer_Advance(&Buffer, 1);
+  Font->Columns = (u16)FileBuffer_ParseInt(&Buffer);
+  FileBuffer_Advance(&Buffer, 1);
+  Font->Rows    = (u16)FileBuffer_ParseInt(&Buffer);
+  FileBuffer_Advance(&Buffer, 1);
+  Font->GlyphCount    = (u16)FileBuffer_ParseInt(&Buffer);
+  FileBuffer_Advance(&Buffer, 1);
+
+}
+
 void LoadSounds(game_state* GameState, game_memory* Memory)
 {
   const char* SoundLocation = "../assets/sounds.txt";
 
-  file_buffer Buffer = {};
-  Buffer.Index       = 0;
+  file_buffer Buffer        = {};
+  Buffer.Index              = 0;
   Memory->ReadFile(&GameState->PermanentArena, SoundLocation, &Buffer.Buffer, &Buffer.Length);
-
 
   u32 NumberOfSounds = 0;
   for (u32 BufferIndex = 0; BufferIndex < Buffer.Length; BufferIndex++)
@@ -157,8 +197,8 @@ void LoadSounds(game_state* GameState, game_memory* Memory)
     u8 c                        = FileBuffer_Current(&Buffer);
     Buffer.Buffer[Buffer.Index] = '\0';
 
-    file_buffer SoundBuffer = {};
-    bool Result                 = Memory->ReadFile(&GameState->PermanentArena, (const char*)&Buffer.Buffer[StartOfSoundLocation], &SoundBuffer.Buffer, &SoundBuffer.Length);
+    file_buffer SoundBuffer     = {};
+    bool        Result          = Memory->ReadFile(&GameState->PermanentArena, (const char*)&Buffer.Buffer[StartOfSoundLocation], &SoundBuffer.Buffer, &SoundBuffer.Length);
     if (Result == false)
     {
       Assert(0 && "Failed to read sound!")
@@ -251,6 +291,21 @@ void CreatePlayer(game_state* GameState)
   GameState->PlayerEntity = Entity;
 }
 
+u32 GetPlayerBulletCount(game_state *GameState)
+{
+  u32 Count = 0;
+  query_result Result = EntityManager_Query(&GameState->EntityManager, TYPE_MASK);
+  for(s32 QueryIndex = 0; QueryIndex < Result.Count; QueryIndex++)
+  {
+    type_component * Type = (type_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Result.Ids[QueryIndex], TYPE_ID);
+    if(Type->Type == EntityType_Bullet_Player)
+    {
+      Count++;
+    }
+  }
+  return Count;
+}
+
 void UseInput(game_state* GameState, game_input* Input)
 {
 
@@ -284,7 +339,12 @@ void UseInput(game_state* GameState, game_input* Input)
   Velocity->X              = NormalizedVelocity.X * PlayerVelocity;
   Velocity->Y              = NormalizedVelocity.Y * PlayerVelocity;
 
-  if (Input->Shoot && Shoot->TimeToShoot <= GameState->CommandBuffer.Time)
+  bool WantsToShoot        = Input->Shoot;
+  bool ShootIsOffCooldown  = Shoot->TimeToShoot <= GameState->CommandBuffer.Time;
+
+  u32 MaxPlayerBullets     = 2;
+  bool HasAvailableBullets = GetPlayerBulletCount(GameState) < MaxPlayerBullets;
+  if (WantsToShoot && ShootIsOffCooldown && HasAvailableBullets)
   {
     u32                BulletMask = RENDER_MASK | POSITION_MASK | VELOCITY_MASK | COLLIDER_MASK | TYPE_MASK | HEALTH_MASK;
     entity             Bullet     = EntityManager_Create_Entity(&GameState->EntityManager, BulletMask);
@@ -308,7 +368,7 @@ void UseInput(game_state* GameState, game_input* Input)
     Type.Type                   = EntityType_Bullet_Player;
     EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type);
 
-    f32 ShootCooldown  = 1.0f;
+    f32 ShootCooldown  = 0.2f;
     Shoot->TimeToShoot = GameState->CommandBuffer.Time + ShootCooldown;
     Inv_PlaySound(GameState, "shoot");
   }
@@ -683,20 +743,22 @@ void RenderHealth(game_state* GameState, pushbuffer* Pushbuffer)
 {
   health_component* Health = EntityManager_GetComponentFromEntity(&GameState->EntityManager, GameState->PlayerEntity, HEALTH_ID);
   f32               X = 25, Y = 25;
-  f32               XOffset              = 30;
+
 
   texture*          FilledHeartTexture   = GetTextureByName(GameState, "filledHeart");
   texture*          UnfilledHeartTexture = GetTextureByName(GameState, "unfilledHeart");
 
   // ToDo find somewhere else?
-  s32 MaxHealth = 3;
+  s32 MaxHealth     = 3;
+  u32 SizeModifier  = 2;
+  f32 XOffset       = 20.0f * SizeModifier;
   for (s32 HealthIndex = 0; HealthIndex < Health->Health; HealthIndex++)
   {
     vec2f Origin = {};
     Origin.X     = X - 0.5f * FilledHeartTexture->Width;
     Origin.Y     = Y - 0.5f * FilledHeartTexture->Height;
-    vec2f XAxis  = V2f((f32)FilledHeartTexture->Width, 0);
-    vec2f YAxis  = V2f(0, (f32)FilledHeartTexture->Height);
+    vec2f XAxis  = V2f((f32)FilledHeartTexture->Width * SizeModifier, 0);
+    vec2f YAxis  = V2f(0, (f32)FilledHeartTexture->Height * SizeModifier);
     Pushbuffer_PushRectTexture(Pushbuffer, FilledHeartTexture, Origin, XAxis, YAxis, true);
     X += XOffset;
   }
@@ -752,6 +814,8 @@ void HandleEnemyShooting(game_state* GameState)
   }
 }
 
+
+
 GAME_UPDATE(GameUpdate)
 {
 
@@ -772,10 +836,14 @@ GAME_UPDATE(GameUpdate)
     u64 TemporaryStorageSize = Memory->TemporaryStorageSize;
     Arena_Create(&GameState->TemporaryArena, Memory->TemporaryStorage, TemporaryStorageSize);
 
+    LoadFont(GameState, Memory);
+
     GameState->CommandBuffer.MaxCommands  = 128;
     GameState->CommandBuffer.Commands     = Arena_Allocate(&GameState->PermanentArena, sizeof(command) * GameState->CommandBuffer.MaxCommands);
     GameState->CommandBuffer.CommandCount = 0;
 
+
+    String_Create(&GameState->PermanentArena, &GameState->ScoreString, 128);
     CommandBuffer_PushDecideSpawn(&GameState->CommandBuffer, 0, 5);
 
     LoadTextures(GameState, Memory);
@@ -788,6 +856,7 @@ GAME_UPDATE(GameUpdate)
   // Omega slow :)
   // Arena_Clear(&GameState->TemporaryArena);
 
+
   UseInput(GameState, Input);
   ExecuteNewCommands(GameState);
   UpdatePhysics(GameState);
@@ -797,6 +866,12 @@ GAME_UPDATE(GameUpdate)
 
   RenderObjects(GameState, Pushbuffer);
   RenderHealth(GameState, Pushbuffer);
+
+
+  string * ScoreString = &GameState->ScoreString;
+  ScoreString->Length = sprintf_s((char *)ScoreString->Buffer, ScoreString->Allocated, "Score: %d", (u32)(GameState->Score / 1000.0f));
+
+  Pushbuffer_PushText(Pushbuffer, ScoreString, &GameState->Font, UI_Text_Alignment_Centered, V2f(GameState->ScreenWidth * 0.80f, GameState->ScreenHeight * 0.05f), 40, 0x00FF0000);
 }
 
 #include <math.h>

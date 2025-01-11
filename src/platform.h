@@ -41,9 +41,27 @@ typedef struct game_input
 
 } game_input;
 
+typedef struct platform_renderer
+{
+  u32 Padding;
+} platform_renderer;
+
 #define GAME_UPDATE(name) void name(game_memory* Memory, game_input* Input, pushbuffer* Pushbuffer)
 typedef GAME_UPDATE(game_update);
 #define GAME_GET_SOUND_SAMPLES(name) void name(game_memory * Memory, game_audio * Audio, u32 SampleFramesToWrite)
 typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
+
+
+#define RENDERER_BEGIN_FRAME(name) void name(platform_renderer * PlatformRenderer, pushbuffer * Pushbuffer)
+typedef RENDERER_BEGIN_FRAME(renderer_begin_frame);
+
+#define RENDERER_END_FRAME(name) void name(platform_renderer * PlatformRenderer, pushbuffer * Pushbuffer)
+typedef RENDERER_END_FRAME(renderer_end_frame);
+
+#define RENDERER_CREATE(name) platform_renderer* name(u32 ScreenWidth, u32 ScreenHeight, HWND hwnd)
+typedef RENDERER_CREATE(renderer_create);
+
+#define RENDERER_RELEASE(name) void name(platform_renderer * PlatformRenderer)
+typedef RENDERER_RELEASE(renderer_release);
 
 #endif

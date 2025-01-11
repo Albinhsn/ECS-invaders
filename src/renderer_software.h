@@ -7,8 +7,8 @@ typedef struct software_renderer
 {
   // This should be a pool?
   u32*     Buffer;
-  u16      Width;
-  u16      Height;
+  u32      Width;
+  u32      Height;
 } software_renderer;
 
 #endif

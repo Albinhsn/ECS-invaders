@@ -1,0 +1,6 @@
+../assets/OpenSansCondensedMediumMSDF.bmp
+42
+58
+12
+8
+95

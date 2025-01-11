@@ -2,21 +2,37 @@
 #define UI_H
 
 #include "common.h"
+#include "image.h"
 
+typedef struct msdf_font
+{
+  image  Image;
+  u16    Columns, Rows;
+  u16    WidthPerCell;
+  u16    HeightPerCell;
+  u16    GlyphCount;
+} msdf_font;
 
-enum UI_WidgetFlags
+typedef enum ui_text_alignment
+{
+  UI_Text_Alignment_Centered,
+  UI_Text_Alignment_Start_At,
+  UI_Text_Alignment_End_At,
+} ui_text_alignment;
+
+enum ui_widget_flags
 {
   UI_WidgetFlag_Clickable = (1 << 0),
 };
 
-struct UI_Widget
+struct ui_widget
 {
+  u32 reserved;
 };
 
-struct UI_Comm
+struct ui_comm
 {
+  u32 reserved;
 };
-
 
 #endif
-

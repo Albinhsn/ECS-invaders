@@ -41,17 +41,36 @@ typedef struct arena
   u64   Offset;
 } arena;
 
+void* Arena_Allocate(arena* Arena, u64 Size)
+{
+
+  if (Arena->Offset + Size > Arena->Size)
+  {
+    Assert(0 && "Allocated outside of the arena!");
+  }
+
+  void* Pointer = (void*)((u8*)Arena->Memory + Arena->Offset);
+  Arena->Offset += Size;
+  char Buffer[1024] = {};
+  sprintf_s(Buffer, ArrayCount(Buffer), "Allocated %lld out of %lld (%.2f)\n", Arena->Offset, Arena->Size, Arena->Offset / (f32)Arena->Size);
+  OutputDebugStringA(Buffer);
+
+  return Pointer;
+}
+
 typedef struct string
 {
   u8* Buffer;
   u32 Length;
+  u32 Allocated;
 } string;
 
-void String_Create(arena* Arena, string* String, u8* Buffer, u32 Length)
+void String_Create(arena* Arena, string* String, u32 Length)
 {
+  String->Buffer = (u8*)Arena_Allocate(Arena, Length);
+  String->Length = 0;
+  String->Allocated = Length;
 }
-
-
 
 
 typedef struct texture texture;
@@ -99,11 +118,18 @@ void* Pool_Alloc(pool_allocator* Pool)
   return memset(Node, 0, Pool->ChunkSize);
 }
 
+bool IsDigit(u8 Char)
+{
+  return (Char >= '0' && Char <= '9');
+}
+bool IsAlpha(u8 Char)
+{
+  return (Char >= 'a' && Char <= 'z') || (Char >= 'A' && Char <= 'Z');
+}
+
 bool IsAlphaOrDigit(u8 Char)
 {
-  bool IsAlpha = (Char >= 'a' && Char <= 'z') || (Char >= 'A' && Char <= 'Z');
-  bool IsDigit = (Char >= '0' && Char <= '9');
-  return IsAlpha | IsDigit;
+  return IsAlpha(Char) || IsDigit(Char);
 }
 
 u32 String_Length(u8* Buffer)
@@ -205,22 +231,7 @@ void Arena_Deallocate(arena* Arena, u64 Size)
   OutputDebugStringA(Buffer);
 }
 
-void* Arena_Allocate(arena* Arena, u64 Size)
-{
 
-  if (Arena->Offset + Size > Arena->Size)
-  {
-    Assert(0 && "Allocated outside of the arena!");
-  }
-
-  void* Pointer = (void*)((u8*)Arena->Memory + Arena->Offset);
-  Arena->Offset += Size;
-  char Buffer[1024] = {};
-  sprintf_s(Buffer, ArrayCount(Buffer), "Allocated %lld out of %lld (%.2f)\n", Arena->Offset, Arena->Size, Arena->Offset / (f32)Arena->Size);
-  OutputDebugStringA(Buffer);
-
-  return Pointer;
-}
 
 void Arena_Reset(arena* Arena)
 {
@@ -313,5 +324,27 @@ u8 FileBuffer_Current(file_buffer * Buffer){
 }
 
 #define FileBuffer_ParseStruct(Buf, Struct) (Struct*)((Buf)->Buffer + (Buf)->Index);FileBuffer_Advance((Buf), sizeof(Struct))
+
+s32  FileBuffer_ParseInt(file_buffer * Buffer)
+{
+  bool Sign = false;
+  s32 Result = 0;
+
+  if(FileBuffer_Current(Buffer) == '-')
+  {
+    FileBuffer_Advance(Buffer, 1);
+    Sign = true;
+  }
+
+  while(IsDigit(FileBuffer_Current(Buffer)))
+  {
+    Result *= 10;
+    Result += FileBuffer_Current(Buffer) - '0';
+    FileBuffer_Advance(Buffer, 1);
+  }
+
+  return Sign ? Result * -1 : Result;
+}
+
 
 #endif
