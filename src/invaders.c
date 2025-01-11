@@ -806,27 +806,71 @@ GAME_UPDATE(GameUpdate)
 
 }
 
+#include <math.h>
+#define TAU (PI * 2)
+void OutputSineWave(u32 SamplesPerSecond, u32 SampleCount, f32 * Samples, f32 ToneHz, f32 ToneVolume)
+{
+  static f64 TSine = 0;
+
+
+  f32 WavePeriod = SamplesPerSecond / ToneHz;
+
+  for(u32 SampleIndex = 0; SampleIndex < SampleCount; SampleIndex++)
+  {
+    f32 Sine = (f32)sin(TSine);
+    f32 Sample = (f32)(Sine * ToneVolume);
+    *Samples++ = Sample;
+    *Samples++ = Sample;
+
+    TSine += TAU / WavePeriod;
+    if(TSine >= TAU){
+      TSine -= TAU;
+    }
+
+  }
+}
+
 
 
 GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 {
   game_state* GameState = (game_state*)Memory->PermanentStorage;
 
-  // Just write any sound into here now
-  #if 0
-  u32 SamplesInBuffer = Audio->SampleFrameCount * Audio->Channels;
-  for(u32 SoundIndex = 0; SoundIndex < GameState->PlayingSoundCount; SoundIndex++)
+  Assert(GameState->SoundCount > 0);
+  sound *Sound = &GameState->Sounds[0];
+  Assert(Sound->Channels == 2);
+  Assert(Audio->Channels == 2);
+  f32 * Buffer = Audio->Buffer;
+  u32 BufferSampleFrameIndex = Audio->SampleFrameIndexGameCode;
+  u32 Prev = BufferSampleFrameIndex;
+  f32 Volume = 0.1f;
+
+  static u32 SampleFramesPlayed = 0;
+  u32 PrevSampleFrames = SampleFramesPlayed;
+  char          Buf[1024] = {};
+  sprintf_s(Buf, ArrayCount(Buf), "Game Thread Starting %d\n", Audio->SampleFrameIndexGameCode);
+  OutputDebugStringA(Buf);
+
+  for(u32 SampleFrameIndex = 0; SampleFrameIndex < SampleFramesToWrite; SampleFrameIndex++)
   {
-    //  If the sound is "over", then remove it from the list
-    playing_sound * Sound = GameState->PlayingSounds + SoundIndex;
+    Buffer[BufferSampleFrameIndex * 2 + 0] = Sound->Samples[SampleFramesPlayed * 2 + 0] * Volume;
+    Buffer[BufferSampleFrameIndex * 2 + 1] = Sound->Samples[SampleFramesPlayed * 2 + 1] * Volume;
 
-    u32 SamplesRemaining = Sound->Sound->SampleFrameCount * Sound->Sound->Channels  - Sound->SampleFramesPlayed;
+    SampleFramesPlayed++;
+    SampleFramesPlayed %= Sound->SampleFrameCount;
 
-    for(u32 SampleIndex = 0; SampleIndex < Audio->SamplesToWrite; SampleIndex++)
-    {
-
-    }
+    BufferSampleFrameIndex++;
+    BufferSampleFrameIndex = BufferSampleFrameIndex % Audio->SampleFrameCount;
   }
-  #endif
+
+
+  Audio->SampleFrameIndexGameCode = BufferSampleFrameIndex;
+
+  char          Buf2[1024] = {};
+  sprintf_s(Buf2, ArrayCount(Buf2), "Game Thread Ending %d\n", Audio->SampleFrameIndexGameCode);
+  OutputDebugStringA(Buf2);
+  
+
+
 }
 

@@ -200,7 +200,7 @@ f32 Win32_GetMillisecondsElapsedF(LARGE_INTEGER Start, LARGE_INTEGER End, s64 Pe
 u32 Win32_GetMillisecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End, s64 PerfCountFrequency)
 {
 
-  return (u32)(1000.0f * ((End.QuadPart - Start.QuadPart) / (f32)PerfCountFrequency));
+  return (u32)Win32_GetMillisecondsElapsedF(Start, End, PerfCountFrequency);
 }
 
 bool Win32_ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Size)
@@ -304,7 +304,7 @@ bool Win32_InitAudio(arena * Arena)
   Assert(GlobalAudio.WaveFormat->Format.nChannels == 2);
 
   // Initialize audio stream
-  REFERENCE_TIME BufferDuration   = GlobalFramerateTargetMS * 1000; // 33 ms? expressed in 100-nanosecond units.
+  REFERENCE_TIME BufferDuration   = GlobalFramerateTargetMS * 10000; // 33 ms? expressed in 100-nanosecond units.
   u32            AudioClientFlags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK | AUDCLNT_STREAMFLAGS_NOPERSIST;
   Result                          = GlobalAudio.AudioClient->lpVtbl->Initialize(GlobalAudio.AudioClient,
                                                                                 AUDCLNT_SHAREMODE_SHARED, // Shared mode or exclusive
@@ -336,6 +336,7 @@ bool Win32_InitAudio(arena * Arena)
     OutputDebugStringA("Failed to get buffer size\n!");
     return false;
   }
+  Assert(GlobalFramerateTargetMS == (u32)(1000.0f * GlobalAudio.BufferFrameCount / GlobalAudio.WaveFormat->Format.nSamplesPerSec));
 
   GlobalAudio.RefillEvent = CreateEventEx(0,                               // pointer to SECURITY_ATTRIBUTES structure
                                           0,                               // Name of the event object, if NULL object is created without a name
@@ -371,12 +372,13 @@ bool Win32_InitAudio(arena * Arena)
 
   u32 NumberOfBuffers                 = 2;
   // Always write one frame worth of buffer
-  GameAudio->SampleFramesToWrite           = GlobalAudio.WaveFormat->Format.nSamplesPerSec / GlobalFramerateTargetMS;
-  GameAudio->SampleFrameCount         = GameAudio->SampleFramesToWrite * NumberOfBuffers;
-  GameAudio->SampleIndexAudioThread   = 0;
-  GameAudio->SampleIndexGameCode      = 0;
+  // This is wrong?
+  u32 SampleFramesToWrite                  = GlobalAudio.BufferFrameCount;
+  GameAudio->SampleFrameCount              = SampleFramesToWrite * NumberOfBuffers;
+  GameAudio->SampleFrameIndexAudioThread   = 0;
+  GameAudio->SampleFrameIndexGameCode      = 0;
   GameAudio->Buffer = (f32*)Arena_Allocate(Arena, sizeof(f32) * GameAudio->SampleFrameCount * GameAudio->Channels);
-
+  GlobalAudio.CanStartThread = false;
   return true;
 }
 
@@ -428,6 +430,19 @@ DWORD Win32_AudioThread_Main(void* Data)
 
   u64 FramesWritten = 0;
   HRESULT Result;
+
+
+  game_audio * GameAudio = &GlobalAudio.GameAudio;
+
+  while(!GlobalAudio.CanStartThread)
+  {
+  }
+
+  char          Buf[1024] = {};
+  sprintf_s(Buf, ArrayCount(Buf), "Audio Thread Starts at %d\n", GlobalAudio.GameAudio.SampleFrameIndexAudioThread);
+  OutputDebugStringA(Buf);
+  LARGE_INTEGER Current = Win32_GetTimeInSeconds();
+  bool HadFirst         = false;
   GlobalAudio.AudioClient->lpVtbl->Start(GlobalAudio.AudioClient);
   while (true)
   {
@@ -436,8 +451,14 @@ DWORD Win32_AudioThread_Main(void* Data)
     // Wait for event
     if (GotEvent == WAIT_OBJECT_0)
     {
+      if(!HadFirst)
+      {
+        Current = Win32_GetTimeInSeconds();
+        HadFirst = true;
+      }
       // ToDo check for device change with guids!
 
+      // ToDo rename?
       u32 BufferSpaceAvailable = 0;
       Result = GlobalAudio.AudioClient->lpVtbl->GetCurrentPadding(GlobalAudio.AudioClient, &BufferSpaceAvailable);
       if(Result == AUDCLNT_E_DEVICE_INVALIDATED){
@@ -449,22 +470,27 @@ DWORD Win32_AudioThread_Main(void* Data)
         u8 *BufferData = 0;
         Result = GlobalAudio.RenderClient->lpVtbl->GetBuffer(GlobalAudio.RenderClient, SampleCount, &BufferData);
 
-        // Here we write into the sound buffer
-        // We assume this is floating point still!
-
-
         f32 * Samples = (f32*)BufferData;
-        game_audio * GameAudio = &GlobalAudio.GameAudio;
-        u32 SamplesInBuffer = GameAudio->SampleFrameCount * GameAudio->Channels;
+
+        Assert(GameAudio->Channels == 2);
+
+
+        char          Buf[1024] = {};
+        sprintf_s(Buf, ArrayCount(Buf), "Audio Thread Starting %d\n", GameAudio->SampleFrameIndexAudioThread);
+        OutputDebugStringA(Buf);
+
         for(u32 SampleToWriteIndex = 0; SampleToWriteIndex < SampleCount; SampleToWriteIndex++)
         {
-
-          Assert(GameAudio->Channels == 2);
-          *Samples++ = *(GameAudio->Buffer + GameAudio->SampleIndexAudioThread++);
-          *Samples++ = *(GameAudio->Buffer + GameAudio->SampleIndexAudioThread++);
-          GameAudio->SampleIndexAudioThread %= SamplesInBuffer;
+          *Samples++ = GameAudio->Buffer[GameAudio->SampleFrameIndexAudioThread * 2 + 0];
+          *Samples++ = GameAudio->Buffer[GameAudio->SampleFrameIndexAudioThread * 2 + 1];
+          GameAudio->SampleFrameIndexAudioThread++;
+          GameAudio->SampleFrameIndexAudioThread %= GameAudio->SampleFrameCount;
         }
-
+        LARGE_INTEGER End = Win32_GetTimeInSeconds();
+        char          Buf2[1024] = {};
+        sprintf_s(Buf2, ArrayCount(Buf2), "Audio Thread Ending %d, timer: %f\n", GameAudio->SampleFrameIndexAudioThread, Win32_GetMillisecondsElapsedF(Current, End, GlobalPerfCountFrequency));
+        OutputDebugStringA(Buf2);
+        Current = End;
 
 
         Result = GlobalAudio.RenderClient->lpVtbl->ReleaseBuffer(GlobalAudio.RenderClient, SampleCount, 0);
@@ -487,6 +513,7 @@ void Win32_UninitAudio()
 
   CoUninitialize();
 }
+
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
@@ -543,25 +570,21 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   QueryPerformanceFrequency(&PerfCountFrequencyResult);
   GlobalPerfCountFrequency = PerfCountFrequencyResult.QuadPart;
 
-
-
-
   bool InitializedAudio = Win32_InitAudio(&GameArena);
   if (!InitializedAudio)
   {
     OutputDebugStringA("Failed to init Audio!\n");
-  }
-
-  // Run a separate thread for audio
-  #if 0
-  GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
-  SetThreadPriority(GlobalAudioThread.Handle, THREAD_PRIORITY_TIME_CRITICAL);
-  #endif
-  if (GlobalAudioThread.Handle == 0)
+  }else
   {
-    OutputDebugStringA("Failed to create audio thread!\n");
+      GlobalAudioThread.Handle = CreateThread(0, 0, Win32_AudioThread_Main, 0, 0, &GlobalAudioThread.Id);
+      if (GlobalAudioThread.Handle == 0)
+      {
+        OutputDebugStringA("Failed to create audio thread!\n");
+      }else
+      {
+        SetThreadPriority(GlobalAudioThread.Handle, THREAD_PRIORITY_TIME_CRITICAL);
+      }
   }
-
 
   win32_game_code GameCode = {};
   Win32_LoadGameCode(&GameCode);
@@ -586,6 +609,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   GameMemory.ReadFile             = Win32_ReadFile;
   f32 DeltaTime                   = GlobalFramerateTargetMS / 1000.0f;
+
+  UINT   DesiredSchedulerMS = 1;
+  bool SleepIsGranular    = timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR;
+  f32 SleepError = 0;
+
   while (!GlobalShouldQuit)
   {
     if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalLibraryPath))
@@ -603,7 +631,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
     if(GameCode.GameGetSoundSamples)
     {
-      GameCode.GameGetSoundSamples(&GameMemory, &GlobalAudio.GameAudio);
+      u32 SampleFramesToWrite           = GlobalAudio.BufferFrameCount;
+      GameCode.GameGetSoundSamples(&GameMemory, &GlobalAudio.GameAudio, SampleFramesToWrite);
+
     }
 
 
@@ -612,26 +642,44 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     Win32_RenderFramebuffer(hwnd);
 
     LARGE_INTEGER CurrentTimer       = Win32_GetTimeInSeconds();
-    u32           FrameTimeMS        = Win32_GetMillisecondsElapsed(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
-    f32           FrameTimeMSF       = Win32_GetMillisecondsElapsedF(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
 
-    char          FrameTimeBuf[1024] = {};
-    sprintf_s(FrameTimeBuf, ArrayCount(FrameTimeBuf), "Frame: %.4f\n", FrameTimeMSF);
-    // OutputDebugStringA(FrameTimeBuf);
+    f32           FrameMinusSleep = Win32_GetMillisecondsElapsedF(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);;
 
-    if (FrameTimeMS < GlobalFramerateTargetMS)
+    if (FrameMinusSleep < GlobalFramerateTargetMS)
     {
-      u32 TimeToSleep = GlobalFramerateTargetMS - FrameTimeMS;
+
+      f32 TargetSleepTime = GlobalFramerateTargetMS - SleepError;
+      f32 TimeToSleep = TargetSleepTime - FrameMinusSleep;
       DeltaTime       = 1.0f / GlobalFramerateTargetMS;
-      Sleep(TimeToSleep);
+      if(SleepIsGranular)
+      {
+        Sleep((u32)TimeToSleep);
+      }
+      f32 FrameTimeMSF       = Win32_GetMillisecondsElapsedF(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);
+      while(FrameTimeMSF < TargetSleepTime)
+      {
+        FrameTimeMSF = Win32_GetMillisecondsElapsedF(PreviousTimer, Win32_GetTimeInSeconds(), GlobalPerfCountFrequency);
+      }
+      f32 Error = SleepError;
+      SleepError = FrameTimeMSF - TargetSleepTime;
+      char          FrameTimeBuf[1024] = {};
+      sprintf_s(FrameTimeBuf, ArrayCount(FrameTimeBuf), "Slept for: %.4f, prev error %f, Frame: %f, Sleep: %f, target: %f\n", FrameTimeMSF, Error, FrameMinusSleep, TimeToSleep, TargetSleepTime);
+      OutputDebugStringA(FrameTimeBuf);
     }
     else
     {
-      DeltaTime = FrameTimeMSF;
+      Assert(0 && "Missed Frame!");
     }
+
 
     CurrentTimer  = Win32_GetTimeInSeconds();
     PreviousTimer = CurrentTimer;
+    char          FrameTimeBuf[1024] = {};
+    sprintf_s(FrameTimeBuf, ArrayCount(FrameTimeBuf), "Frame: %.4f\n", FrameMinusSleep);
+    OutputDebugStringA(FrameTimeBuf);
+
+    GlobalAudio.CanStartThread = true;
+
   }
 
   bool Result = TerminateThread(GlobalAudioThread.Handle, 0);

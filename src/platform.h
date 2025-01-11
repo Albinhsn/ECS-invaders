@@ -27,9 +27,8 @@ typedef struct game_audio
   f32 * Buffer;               // size is Channels * SampleFrameCount
   u32 Channels;
   u32 SampleFrameCount;
-  u32 SampleIndexAudioThread; // The index that the audio thread copies from
-  u32 SampleIndexGameCode;    // The index that the game code writes into
-  u32 SampleFramesToWrite;         // This is number of sample frames
+  u32 SampleFrameIndexAudioThread; // The index that the audio thread copies from
+  u32 SampleFrameIndexGameCode;    // The index that the game code writes into
 } game_audio;
 
 typedef struct game_input
@@ -44,7 +43,7 @@ typedef struct game_input
 
 #define GAME_UPDATE(name) void name(game_memory* Memory, game_input* Input, pushbuffer* Pushbuffer)
 typedef GAME_UPDATE(game_update);
-#define GAME_GET_SOUND_SAMPLES(name) void name(game_memory * Memory, game_audio * Audio)
+#define GAME_GET_SOUND_SAMPLES(name) void name(game_memory * Memory, game_audio * Audio, u32 SampleFramesToWrite)
 typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
 
 #endif

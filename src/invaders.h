@@ -28,13 +28,7 @@ typedef struct command_buffer
   u32      CommandCount;
 } command_buffer;
 
-typedef struct texture_node texture_node;
-struct texture_node
-{
-  texture_node* Next;
-  texture*      Texture;
-  const char*   Name;
-};
+
 
 #define MAX_SOUND_COUNT 16
 #define MAX_PLAYING_SOUND_COUNT 16
@@ -46,9 +40,9 @@ typedef struct game_state
   entity_manager  EntityManager;
   entity          PlayerEntity;
   texture*        Textures;
+  u32             TextureCount;
   command_buffer  CommandBuffer;
   u32             ScreenWidth, ScreenHeight;
-  u32             TextureCount;
   f32             DeltaTime;
   vec2f           PlayerPosition;
   f32             Score;

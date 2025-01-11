@@ -76,6 +76,7 @@ typedef struct win32_audio
   u32                          BufferFrameCount;
   HANDLE                       RefillEvent;
   game_audio                   GameAudio;
+  bool CanStartThread;
 } win32_audio;
 
 #endif
