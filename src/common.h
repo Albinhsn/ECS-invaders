@@ -308,6 +308,10 @@ void FileBuffer_Advance(file_buffer * Buffer, u32 Count)
   Buffer->Index += Count;
 }
 
+u8 FileBuffer_Current(file_buffer * Buffer){
+  return Buffer->Buffer[Buffer->Index];
+}
+
 #define FileBuffer_ParseStruct(Buf, Struct) (Struct*)((Buf)->Buffer + (Buf)->Index);FileBuffer_Advance((Buf), sizeof(Struct))
 
 #endif

@@ -31,13 +31,10 @@ The ECS way is to create systems or components to solve things
 
 
 # ToDo
-* Hoist and expand file_buffer
-* Use the filebuffer when parsing textures/sounds
-* Reenable enemy spawning
-* Load BMP
 * Be able to draw the part of the image based on input char
 * Draw Text based on the image
 * Figure out spacings
+* Player can shoot two bullets?
 
 
 * Draw Text
