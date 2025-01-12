@@ -20,10 +20,11 @@ static const char*             GlobalRenderCodeTempPath    = "../build/lock1.tmp
 static const char*             GlobalGameCodePath = "../build/invaders.dll";
 
 #if RENDERER_SOFTWARE
-static const char*             GlobalRenderCodePath = "../build/win32_renderer_gl.dll";
+static const char*             GlobalRenderCodePath = "../build/win32_renderer_software.dll";
 #elif RENDERER_GL
 static const char*             GlobalRenderCodePath = "../build/win32_renderer_gl.dll";
 #endif
+
 static win32_thread            GlobalAudioThread;
 static win32_audio             GlobalAudio;
 
@@ -695,7 +696,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     }
     else
     {
-      Assert(0 && "Missed Frame!");
+      DeltaTime = 1.0f / GlobalFramerateTargetMS;
+      OutputDebugStringA("Missed Frame!");
     }
 
 

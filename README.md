@@ -32,20 +32,7 @@ The ECS way is to create systems or components to solve things
 
 
 # ToDo
-* Hoist the software renderer to the new approach
-  * Create Win32_Software_Renderer
-
-
-* UI
-* Fully hoist the renderer
-  * In platform.h have
-    * Begin Frame
-      * Takes the platform_renderer and a pushbuffer
-    * End Frame
-      * Takes the platform_renderer and a pushbuffer
-    * Init/Create
-      * Returns a platform_renderer 
-        * the platform_renderer is a pointer to the beginning of the actual renderer
-  * The renderer allocates it's own memory and you make like a win32_opengl.c
 
 * OpenGL renderer
+  * Precompile/init shaders (from a file or just list in the code)
+* UI
