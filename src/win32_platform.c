@@ -494,10 +494,11 @@ DWORD Win32_AudioThread_Main(void* Data)
 
         Assert(GameAudio->Channels == 2);
 
-
+        #if 0
         char          Buf[1024] = {};
         sprintf_s(Buf, ArrayCount(Buf), "Audio Thread Starting %d\n", GameAudio->SampleFrameIndexAudioThread);
         OutputDebugStringA(Buf);
+        #endif
 
         for(u32 SampleToWriteIndex = 0; SampleToWriteIndex < SampleCount; SampleToWriteIndex++)
         {
@@ -506,11 +507,13 @@ DWORD Win32_AudioThread_Main(void* Data)
           GameAudio->SampleFrameIndexAudioThread++;
           GameAudio->SampleFrameIndexAudioThread %= GameAudio->SampleFrameCount;
         }
+        #if 0
         LARGE_INTEGER End = Win32_GetTimeInSeconds();
         char          Buf2[1024] = {};
         sprintf_s(Buf2, ArrayCount(Buf2), "Audio Thread Ending %d, timer: %f\n", GameAudio->SampleFrameIndexAudioThread, Win32_GetMillisecondsElapsedF(Current, End, GlobalPerfCountFrequency));
         OutputDebugStringA(Buf2);
         Current = End;
+        #endif
 
 
         Result = GlobalAudio.RenderClient->lpVtbl->ReleaseBuffer(GlobalAudio.RenderClient, SampleCount, 0);

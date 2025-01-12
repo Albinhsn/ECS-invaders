@@ -34,8 +34,9 @@ The ECS way is to create systems or components to solve things
 # ToDo
 
 * OpenGL renderer
+  * Create new for texture shader
   * Write the shaders
     * Draw texture
-    * Draw text
-    * Draw quad as well tbh
+    * Draw text is the same as draw texture
+    * Draw quad
 * UI

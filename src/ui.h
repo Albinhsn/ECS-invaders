@@ -6,11 +6,12 @@
 
 typedef struct msdf_font
 {
-  image  Image;
+  texture Texture;
   u16    Columns, Rows;
   u16    WidthPerCell;
   u16    HeightPerCell;
   u16    GlyphCount;
+
 } msdf_font;
 
 typedef enum ui_text_alignment

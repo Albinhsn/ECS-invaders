@@ -132,9 +132,9 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
       // Construct X Quads of the given size, with the width being based on the width/height of a cell in the font
       msdf_font* Font = Entry.Font;
       texture Texture = {};
-      Texture.Memory = Font->Image.Buffer;
-      Texture.Width= Font->Image.Width;
-      Texture.Height= Font->Image.Height;
+      Texture.Memory = Font->Texture.Memory;
+      Texture.Width= Font->Texture.Width;
+      Texture.Height= Font->Texture.Height;
 
       u32 * Buffer = Renderer->Buffer;
       u32 Width    = Renderer->Width;
@@ -160,10 +160,10 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
 
           Assert(CellX < Font->Columns && CellY < Font->Rows);
 
-          f32 MaxU = Font->WidthPerCell  /(f32)Font->Image.Width;
-          f32 MaxV = Font->HeightPerCell  /(f32)Font->Image.Height;
-          f32 UOffset = CellX * Font->WidthPerCell / (f32)Font->Image.Width;
-          f32 VOffset = CellY * Font->HeightPerCell / (f32)Font->Image.Height;
+          f32 MaxU = Font->WidthPerCell  /(f32)Font->Texture.Width;
+          f32 MaxV = Font->HeightPerCell  /(f32)Font->Texture.Height;
+          f32 UOffset = CellX * Font->WidthPerCell / (f32)Font->Texture.Width;
+          f32 VOffset = CellY * Font->HeightPerCell / (f32)Font->Texture.Height;
 
           Assert(UOffset <= 1.0f && VOffset <= 1.0f);
           for (s32 Y = 0; Y < (s32)HeightOfLetter; Y++)

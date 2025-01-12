@@ -145,9 +145,11 @@ void LoadFont(game_state *GameState, game_memory * Memory)
   Assert(Result == true);
 
 
-
-  Image_LoadBMP(&GameState->PermanentArena, &Font->Image, FontBuffer.Buffer, FontBuffer.Length);
-
+  image Image = {};
+  Image_LoadBMP(&GameState->PermanentArena, &Image, FontBuffer.Buffer, FontBuffer.Length);
+  Font->Texture.Memory  = Image.Buffer;
+  Font->Texture.Width   = Image.Width;
+  Font->Texture.Height  = Image.Height;
   FileBuffer_Advance(&Buffer, 1);
 
 
@@ -427,6 +429,10 @@ bool IsColliding(type_component* T0, collider_component* C0, position_component*
     CanCollide = false;
   }
   else if ((T0->Type == EntityType_Enemy && T1->Type == EntityType_Bullet_Enemy) || (T0->Type == EntityType_Bullet_Enemy && T1->Type == EntityType_Enemy))
+  {
+    CanCollide = false;
+  }
+  else if((T0->Type == EntityType_Bullet_Player && T1->Type == EntityType_Bullet_Enemy) || (T0->Type == EntityType_Bullet_Enemy && T1->Type == EntityType_Bullet_Player))
   {
     CanCollide = false;
   }
@@ -790,7 +796,7 @@ void HandleEnemyShooting(game_state* GameState)
       YAxis.X                           = cosf(EnemyPosition->Rotation + PI / 2);
       YAxis.Y                           = sinf(EnemyPosition->Rotation + PI / 2);
 
-      u32                BulletMask     = RENDER_MASK | POSITION_MASK | VELOCITY_MASK | COLLIDER_MASK | TYPE_MASK;
+      u32                BulletMask     = RENDER_MASK | POSITION_MASK | VELOCITY_MASK | COLLIDER_MASK | TYPE_MASK | HEALTH_MASK;
       entity             Bullet         = EntityManager_Create_Entity(&GameState->EntityManager, BulletMask);
       position_component Position       = *EnemyPosition;
       vec2f              PositionOffset = Vec2f_Scale(YAxis, 40);
@@ -808,7 +814,9 @@ void HandleEnemyShooting(game_state* GameState)
 
       type_component     Type     = {};
       Type.Type                   = EntityType_Bullet_Enemy;
-      EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 5, &Position, &Velocity, &Render, &Collider, &Type);
+      health_component Health = {};
+      Health.Health = 1;
+      EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type);
       Shoot->TimeToShoot = GetNextShootTime(GameState->CommandBuffer.Time);
     }
   }
@@ -856,7 +864,7 @@ GAME_UPDATE(GameUpdate)
   // Omega slow :)
   // Arena_Clear(&GameState->TemporaryArena);
 
-
+  #if 1
   UseInput(GameState, Input);
   ExecuteNewCommands(GameState);
   UpdatePhysics(GameState);
@@ -866,35 +874,10 @@ GAME_UPDATE(GameUpdate)
 
   RenderObjects(GameState, Pushbuffer);
   RenderHealth(GameState, Pushbuffer);
-
+  #endif
 
   string * ScoreString = &GameState->ScoreString;
   ScoreString->Length = sprintf_s((char *)ScoreString->Buffer, ScoreString->Allocated, "Score: %d", (u32)(GameState->Score / 1000.0f));
-
-  static f32 Rotation = 0;
-  Rotation = GameState->CommandBuffer.Time;
-  u32 Width = 50, Height = 50;
-  vec2f XAxis  = {};
-  XAxis.X      = cosf(Rotation);
-  XAxis.Y      = sinf(Rotation);
-  XAxis        = Vec2f_Scale(XAxis, (f32)Width);
-
-  vec2f YAxis  = {};
-  YAxis.X      = cosf(Rotation + PI / 2);
-  YAxis.Y      = sinf(Rotation + PI / 2);
-  YAxis        = Vec2f_Scale(YAxis, -(f32)Height);
-
-  vec2f Origin = V2f(GameState->ScreenWidth * 0.5f, GameState->ScreenHeight * 0.5f);
-  Origin = Vec2f_Sub(Origin, Vec2f_Scale(XAxis, 0.5f));
-  Origin = Vec2f_Sub(Origin, Vec2f_Scale(YAxis, 0.5f));
-
-  Pushbuffer_PushRectColor(
-          Pushbuffer,
-          Origin,
-          XAxis,
-          YAxis,
-          0x00FF0000
-          );
   Pushbuffer_PushText(Pushbuffer, ScoreString, &GameState->Font, UI_Text_Alignment_Centered, V2f(GameState->ScreenWidth * 0.80f, GameState->ScreenHeight * 0.05f), 40, 0x00FF0000);
 
 }

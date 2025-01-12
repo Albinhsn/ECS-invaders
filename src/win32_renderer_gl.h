@@ -34,9 +34,17 @@ typedef struct win32_renderer_gl
 
   arena Arena;
 
-  u32 VAO;
-  u32 VBO;
-  u32 EBO;
+  u32 VAOT;
+  u32 VBOT;
+  u32 EBOT;
+
+  u32 VAOText;
+  u32 VBOText;
+  u32 EBOText;
+
+  u32 VAOQ;
+  u32 VBOQ;
+  u32 EBOQ;
 
   u32 ScreenWidth;
   u32 ScreenHeight;

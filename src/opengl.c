@@ -67,11 +67,12 @@ PFNGLGETATTRIBLOCATIONPROC        glGetAttribLocation        = NULL;
 PFNGLISPROGRAMPROC                glIsProgram                = NULL;
 PFNGLDRAWELEMENTSBASEVERTEXPROC   glDrawElementsBaseVertex   = NULL;
 PFNGLFRAMEBUFFERTEXTUREPROC       glFramebufferTexture       = NULL;
-
+PFNGLACTIVETEXTUREPROC            glActiveTexture            = NULL;
 
 void GL_LoadExtensions(void*(LoadProcedure(const char *)))
 {
 
+  glActiveTexture            = (PFNGLACTIVETEXTUREPROC)LoadProcedure("glActiveTexture");
   glFramebufferTexture       = (PFNGLFRAMEBUFFERTEXTUREPROC)LoadProcedure("glFramebufferTexture");
   glDrawElementsBaseVertex   = (PFNGLDRAWELEMENTSBASEVERTEXPROC)LoadProcedure("glDrawElementsBaseVertex");
   glIsProgram                = (PFNGLISPROGRAMPROC)LoadProcedure("glIsProgram");

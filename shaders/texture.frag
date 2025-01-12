@@ -1,9 +1,19 @@
 #version 450 core
 
-uniform vec4 color;
+
+
+in vec2 UV;
+
+uniform sampler2D texture1;
 out vec4 FragColor;
 
 void main()
 {
-  FragColor = color;
+
+  vec4 Sample = texture(texture1, UV);
+  if(Sample.a == 0)
+  {
+    discard;
+  }
+  FragColor = Sample;
 }
