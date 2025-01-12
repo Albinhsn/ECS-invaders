@@ -25,6 +25,21 @@ typedef struct win32_renderer_gl
   platform_renderer Header;
   HWND hwnd;
   HGLRC Context;
+
+  gl_texture Textures[8];
+  u32 TextureCount;
+
+  shader Shaders[4];
+  u32 ShaderCount;
+
+  arena Arena;
+
+  u32 VAO;
+  u32 VBO;
+  u32 EBO;
+
+  u32 ScreenWidth;
+  u32 ScreenHeight;
 }win32_renderer_gl;
 
 #endif

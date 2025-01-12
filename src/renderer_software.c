@@ -286,8 +286,6 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
 
       u32*  Buffer      = Renderer->Buffer;
 
-      u32   Color       = 0x00FF0000;
-
       vec2f XAxis       = Entry.XAxis;
       vec2f YAxis       = Entry.YAxis;
       f32   XAxisLength = Vec2f_Length(XAxis);

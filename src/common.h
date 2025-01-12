@@ -346,5 +346,26 @@ s32  FileBuffer_ParseInt(file_buffer * Buffer)
   return Sign ? Result * -1 : Result;
 }
 
+void FileBuffer_ParseString(file_buffer * Buffer, string * String)
+{
+  // ToDo improve this?
+  u32 StartOfString = Buffer->Index;
+  String->Buffer = &Buffer->Buffer[Buffer->Index];
+  while(FileBuffer_Current(Buffer) != '\n' && FileBuffer_Current(Buffer) != ' ')
+  {
+    FileBuffer_Advance(Buffer, 1);
+  }
+
+  String->Length = Buffer->Index - StartOfString;
+
+
+}
+void FileBuffer_SkipWhitespace(file_buffer * Buffer)
+{
+  while(FileBuffer_Current(Buffer) == '\n' || FileBuffer_Current(Buffer) == ' ')
+  {
+    FileBuffer_Advance(Buffer, 1);
+  }
+}
 
 #endif

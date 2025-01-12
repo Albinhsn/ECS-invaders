@@ -29,10 +29,13 @@ The ECS way is to create systems or components to solve things
 * Roll your own printf
 * Improved Font rendering
 * Write an actual lexer/parser for custom file formats
-
+* Hoist platform utility functions out to something like win32_utility
 
 # ToDo
 
 * OpenGL renderer
-  * Precompile/init shaders (from a file or just list in the code)
+  * Write the shaders
+    * Draw texture
+    * Draw text
+    * Draw quad as well tbh
 * UI

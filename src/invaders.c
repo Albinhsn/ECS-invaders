@@ -871,7 +871,32 @@ GAME_UPDATE(GameUpdate)
   string * ScoreString = &GameState->ScoreString;
   ScoreString->Length = sprintf_s((char *)ScoreString->Buffer, ScoreString->Allocated, "Score: %d", (u32)(GameState->Score / 1000.0f));
 
+  static f32 Rotation = 0;
+  Rotation = GameState->CommandBuffer.Time;
+  u32 Width = 50, Height = 50;
+  vec2f XAxis  = {};
+  XAxis.X      = cosf(Rotation);
+  XAxis.Y      = sinf(Rotation);
+  XAxis        = Vec2f_Scale(XAxis, (f32)Width);
+
+  vec2f YAxis  = {};
+  YAxis.X      = cosf(Rotation + PI / 2);
+  YAxis.Y      = sinf(Rotation + PI / 2);
+  YAxis        = Vec2f_Scale(YAxis, -(f32)Height);
+
+  vec2f Origin = V2f(GameState->ScreenWidth * 0.5f, GameState->ScreenHeight * 0.5f);
+  Origin = Vec2f_Sub(Origin, Vec2f_Scale(XAxis, 0.5f));
+  Origin = Vec2f_Sub(Origin, Vec2f_Scale(YAxis, 0.5f));
+
+  Pushbuffer_PushRectColor(
+          Pushbuffer,
+          Origin,
+          XAxis,
+          YAxis,
+          0x00FF0000
+          );
   Pushbuffer_PushText(Pushbuffer, ScoreString, &GameState->Font, UI_Text_Alignment_Centered, V2f(GameState->ScreenWidth * 0.80f, GameState->ScreenHeight * 0.05f), 40, 0x00FF0000);
+
 }
 
 #include <math.h>
