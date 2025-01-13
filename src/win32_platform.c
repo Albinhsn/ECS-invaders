@@ -645,6 +645,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
   while (!GlobalShouldQuit)
   {
     RenderCode.BeginFrame(PlatformRenderer, &Pushbuffer);
+    ResetInput();
     if (Win32_FileHasChanged(&GameCodeLastChanged, GlobalGameCodePath))
     {
       Win32_FreeGameCode(&GameCode);

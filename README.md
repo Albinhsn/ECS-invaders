@@ -1,10 +1,6 @@
 # Invaders
-Doing a basic invaders to teach myself ECS, win32, Audio and Multithreading and a bunch of other things
+Doing a basic invaders to teach myself ECS, win32, Audio and a bunch of other things
 
-The ECS way is to create systems or components to solve things
-* Needs extra data for something
-    * Create a component
-* Then create the system that solves that problem
 
 # Things i'd like to solve in this project
 * ECS
@@ -30,13 +26,13 @@ The ECS way is to create systems or components to solve things
 * Improved Font rendering
 * Write an actual lexer/parser for custom file formats
 * Hoist platform utility functions out to something like win32_utility
+* Figure out a better way to handle things in the renderer
 
 # ToDo
+* Send mouse location and button presses in input
 
-* OpenGL renderer
-  * Create new for texture shader
-  * Write the shaders
-    * Draw texture
-    * Draw text is the same as draw texture
-    * Draw quad
 * UI
+    * Button
+    * Input Field
+* Transition between running the game and menu
+* Save highscores
