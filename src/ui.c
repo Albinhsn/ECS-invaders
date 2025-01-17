@@ -35,25 +35,25 @@ void UI_Init(ui_state* UI_, void* Memory, u32 MemorySize, u32 WidgetCount)
 
 void UI_SetPersitent(ui_widget* Data)
 {
-  if(UI->PersistentData != 0)
+  if (UI->PersistentData != 0)
   {
     UI->PersistentData->Next = Data;
   }
-  Data->Prev = UI->PersistentData; 
+  Data->Prev         = UI->PersistentData;
   UI->PersistentData = Data;
 }
 
 ui_widget* UI_GetPersitent(u64 Key)
 {
-  ui_widget * Out = 0;
-  ui_widget * Head = UI->PersistentData;
-  while(Head)
+  ui_widget* Out  = 0;
+  ui_widget* Head = UI->PersistentData;
+  while (Head)
   {
-    if(Head->Key == Key)
+    if (Head->Key == Key)
     {
       Head->Next->Prev = Head->Prev;
       Head->Prev->Next = Head->Next;
-      Out = Head;
+      Out              = Head;
       break;
     }
 
@@ -66,6 +66,10 @@ ui_widget* UI_WidgetCreate()
 {
   ui_widget* Widget = (ui_widget*)Pool_Alloc(&UI->WidgetPool);
   return Widget;
+}
+
+void UI_WidgetFree(ui_widget* Widget)
+{
 }
 
 bool UI_Hovering(rect2 Rect)
@@ -110,17 +114,16 @@ void UI_StartFrame(game_input* Input)
 
   // Make sure every stack is empty
   // Create a default first parent for the screen
-  Assert(WidgetSizeHead);
-  Assert(TextAlignHead);
-  Assert(ChildLayoutAxisHead);
-  Assert(FontHead);
-  Assert(FontSizeHead);
+  Assert(UI->WidgetSizeHead);
+  Assert(UI->TextAlignHead);
+  Assert(UI->ChildLayoutAxisHead);
+  Assert(UI->FontHead);
+  Assert(UI->FontSizeHead);
 }
 
 void UI_EndFrame(pushbuffer* Pushbuffer)
 {
   // Create final layout data
-  //  Store persistent data here as well
 
   // Render using the new layout data
   //  At the same time we can free the widget at the end of its use
@@ -135,21 +138,21 @@ void UI_EndFrame(pushbuffer* Pushbuffer)
   // Reset and swap arenas
 }
 
-void UI_PushParent(ui_widget * Widget)
+void UI_PushParent(ui_widget* Widget)
 {
 
   UI->Parent->Next = Widget;
-  Widget->Prev = UI->Parent;
-  UI->Parent = Widget;
+  Widget->Prev     = UI->Parent;
+  UI->Parent       = Widget;
 }
 
-void UI_PopParent(){
-  ui_widget * Out = UI->Parent;
+void UI_PopParent()
+{
+  ui_widget* Out  = UI->Parent;
   Out->Prev->Next = 0;
-  UI->Parent = Out->Prev;
+  UI->Parent      = Out->Prev;
 
   Pool_Free(&UI->WidgetPool, (u64)Out);
-
 }
 
 ui_widget* UI_GetParent()
@@ -169,7 +172,12 @@ ui_widget* UI_BuildWidgetFromString(ui_widget_flags Flags, string String)
 
 ui_comm UI_GetCommFromWidget(ui_widget* Widget)
 {
-  return (ui_comm){};
+  ui_comm Comm          = {};
+  rect2   FinalPosition = Widget->FinalRect;
+  Comm.Hovered          = UI_Hovering(FinalPosition);
+  Comm.Released         = Comm.Hovered && UI_Clicked();
+  Comm.Pressed          = Comm.Hovered && UI_Pressing();
+  return Comm;
 }
 
 ui_comm UI_Button(const char* Text)
@@ -186,31 +194,31 @@ ui_comm UI_Button(const char* Text)
   if (Widget == 0)
   {
     // Use the previous frames data  (if it exists)
-    ui_widget* Widget   = UI_WidgetCreate();
-    Widget->String      = String;
-    Widget->Font        = UI->FontHead->Font;
-    Widget->Flags       = UI_WidgetFlag_Clickable | UI_WidgetFlag_AnimateClick | UI_WidgetFlag_AnimateHover | UI_WidgetFlag_DrawBackground;
-    Widget->Parent      = UI->Parent;
-    Widget->FontSize    = UI->FontSizeHead->FontSize;
-    Widget->FixedRect   = UI->WidgetSizeHead->FixedRect;
+    ui_widget* Widget = UI_WidgetCreate(); // Change this to different call!
+    Widget->Key       = Key;
+    Widget->String    = String;
+    Widget->Font      = UI->FontHead->Font;
+    Widget->Flags     = UI_WidgetFlag_Clickable | UI_WidgetFlag_AnimateClick | UI_WidgetFlag_AnimateHover | UI_WidgetFlag_DrawBackground;
+    Widget->Parent    = UI->Parent;
+    Widget->FontSize  = UI->FontSizeHead->FontSize;
+    Widget->FixedRect = UI->WidgetSizeHead->FixedRect;
 
-    rect2 FinalPosition = Widget->FinalRect;
     // Check whether we intersected this frame with
-    Comm.Hovered  = UI_Hovering(FinalPosition);
-    Comm.Released = Comm.Hovered && UI_Clicked();
-    Comm.Pressed  = Comm.Hovered && UI_Pressing();
+    Comm = UI_GetCommFromWidget(Widget);
   }
+
+  // Add new time etc to animations
 
   // Add this to the hierarchy
 
-  ui_widget * Parent  = UI_GetParent();
-  if(Parent->Last != 0)
+  ui_widget* Parent = UI_GetParent();
+  if (Parent->Last != 0)
   {
-    Parent->Last->Next  = Widget;
-    Widget->Prev        = Parent->Last;
+    Parent->Last->Next = Widget;
+    Widget->Prev       = Parent->Last;
   }
-  Parent->Last        = Widget;
-  Widget->Parent      = Parent;
+  Parent->Last   = Widget;
+  Widget->Parent = Parent;
 
   return Comm;
 }
@@ -220,11 +228,9 @@ ui_comm UI_InputField()
   ui_comm Comm = {};
 
   // Get (if it exist) the persistent data for this
-  // Figure out location of input field
   //
+  // Allocate a new string in the next arena
+  // Copy it over
+  // Look at events to figure out if we add anything to the string
   return Comm;
-}
-
-void UI_WidgetFree(ui_widget* Widget)
-{
 }
