@@ -104,19 +104,6 @@ void Memcpy(u8* Dest, u8* Src, u32 Count)
   }
 }
 
-void* Pool_Alloc(pool_allocator* Pool)
-{
-  pool_free_node* Node = Pool->Head;
-  if (Node == 0)
-  {
-    Assert(0 && "Pool allocator has no memory");
-    return 0;
-  }
-
-  Pool->Head = Node->Next;
-
-  return memset(Node, 0, Pool->ChunkSize);
-}
 
 bool IsDigit(u8 Char)
 {
@@ -158,6 +145,19 @@ bool String_Compare(string* s0, string* s1)
   return true;
 }
 
+void* Pool_Alloc(pool_allocator* Pool)
+{
+  pool_free_node* Node = Pool->Head;
+  if (Node == 0)
+  {
+    Assert(0 && "Pool allocator has no memory");
+    return 0;
+  }
+
+  Pool->Head = Node->Next;
+
+  return memset(Node, 0, Pool->ChunkSize);
+}
 void Pool_Free(pool_allocator* Pool, u64 Ptr)
 {
   if (Ptr == 0)

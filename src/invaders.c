@@ -5,6 +5,7 @@
 #include "pushbuffer.c"
 #include "sound.c"
 #include "vector.c"
+#include <math.h>
 
 sound* GetSoundByName(game_state* GameState, const char* SoundName)
 {
@@ -123,35 +124,32 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
   }
 }
 
-void LoadFont(game_state *GameState, game_memory * Memory)
+void LoadFont(game_state* GameState, game_memory* Memory)
 {
-  const char * FontLocation = "../assets/font.txt";
-  file_buffer Buffer        = {};
-  Buffer.Index              = 0;
+  const char* FontLocation = "../assets/font.txt";
+  file_buffer Buffer       = {};
+  Buffer.Index             = 0;
   Memory->ReadFile(&GameState->PermanentArena, FontLocation, &Buffer.Buffer, &Buffer.Length);
 
-
-  msdf_font *Font = &GameState->Font;
-  while(FileBuffer_Current(&Buffer) != '\n')
+  msdf_font* Font = &GameState->Font;
+  while (FileBuffer_Current(&Buffer) != '\n')
   {
     FileBuffer_Advance(&Buffer, 1);
   }
 
-  file_buffer FontBuffer = {};
+  file_buffer FontBuffer      = {};
 
-  u8 c = FileBuffer_Current(&Buffer);
+  u8          c               = FileBuffer_Current(&Buffer);
   Buffer.Buffer[Buffer.Index] = '\0';
-  bool Result = Memory->ReadFile(&GameState->PermanentArena, (const char*)Buffer.Buffer, &FontBuffer.Buffer, &FontBuffer.Length);
+  bool Result                 = Memory->ReadFile(&GameState->PermanentArena, (const char*)Buffer.Buffer, &FontBuffer.Buffer, &FontBuffer.Length);
   Assert(Result == true);
-
 
   image Image = {};
   Image_LoadBMP(&GameState->PermanentArena, &Image, FontBuffer.Buffer, FontBuffer.Length);
-  Font->Texture.Memory  = Image.Buffer;
-  Font->Texture.Width   = Image.Width;
-  Font->Texture.Height  = Image.Height;
+  Font->Texture.Memory = Image.Buffer;
+  Font->Texture.Width  = Image.Width;
+  Font->Texture.Height = Image.Height;
   FileBuffer_Advance(&Buffer, 1);
-
 
   Font->WidthPerCell = (u16)FileBuffer_ParseInt(&Buffer);
   FileBuffer_Advance(&Buffer, 1);
@@ -159,11 +157,10 @@ void LoadFont(game_state *GameState, game_memory * Memory)
   FileBuffer_Advance(&Buffer, 1);
   Font->Columns = (u16)FileBuffer_ParseInt(&Buffer);
   FileBuffer_Advance(&Buffer, 1);
-  Font->Rows    = (u16)FileBuffer_ParseInt(&Buffer);
+  Font->Rows = (u16)FileBuffer_ParseInt(&Buffer);
   FileBuffer_Advance(&Buffer, 1);
-  Font->GlyphCount    = (u16)FileBuffer_ParseInt(&Buffer);
+  Font->GlyphCount = (u16)FileBuffer_ParseInt(&Buffer);
   FileBuffer_Advance(&Buffer, 1);
-
 }
 
 void LoadSounds(game_state* GameState, game_memory* Memory)
@@ -293,14 +290,14 @@ void CreatePlayer(game_state* GameState)
   GameState->PlayerEntity = Entity;
 }
 
-u32 GetPlayerBulletCount(game_state *GameState)
+u32 GetPlayerBulletCount(game_state* GameState)
 {
-  u32 Count = 0;
+  u32          Count  = 0;
   query_result Result = EntityManager_Query(&GameState->EntityManager, TYPE_MASK);
-  for(s32 QueryIndex = 0; QueryIndex < Result.Count; QueryIndex++)
+  for (s32 QueryIndex = 0; QueryIndex < Result.Count; QueryIndex++)
   {
-    type_component * Type = (type_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Result.Ids[QueryIndex], TYPE_ID);
-    if(Type->Type == EntityType_Bullet_Player)
+    type_component* Type = (type_component*)EntityManager_GetComponentFromEntity(&GameState->EntityManager, Result.Ids[QueryIndex], TYPE_ID);
+    if (Type->Type == EntityType_Bullet_Player)
     {
       Count++;
     }
@@ -344,7 +341,7 @@ void UseInput(game_state* GameState, game_input* Input)
   bool WantsToShoot        = Input->Shoot;
   bool ShootIsOffCooldown  = Shoot->TimeToShoot <= GameState->CommandBuffer.Time;
 
-  u32 MaxPlayerBullets     = 2;
+  u32  MaxPlayerBullets    = 2;
   bool HasAvailableBullets = GetPlayerBulletCount(GameState) < MaxPlayerBullets;
   if (WantsToShoot && ShootIsOffCooldown && HasAvailableBullets)
   {
@@ -432,7 +429,7 @@ bool IsColliding(type_component* T0, collider_component* C0, position_component*
   {
     CanCollide = false;
   }
-  else if((T0->Type == EntityType_Bullet_Player && T1->Type == EntityType_Bullet_Enemy) || (T0->Type == EntityType_Bullet_Enemy && T1->Type == EntityType_Bullet_Player))
+  else if ((T0->Type == EntityType_Bullet_Player && T1->Type == EntityType_Bullet_Enemy) || (T0->Type == EntityType_Bullet_Enemy && T1->Type == EntityType_Bullet_Player))
   {
     CanCollide = false;
   }
@@ -575,7 +572,7 @@ void RemoveDeadUnits(game_state* GameState)
       if (Entity == GameState->PlayerEntity)
       {
         // You Died!
-        Assert(0 && "Why you die noob!");
+        GameState->State = GameState_InputName;
       }
       else
       {
@@ -750,14 +747,13 @@ void RenderHealth(game_state* GameState, pushbuffer* Pushbuffer)
   health_component* Health = EntityManager_GetComponentFromEntity(&GameState->EntityManager, GameState->PlayerEntity, HEALTH_ID);
   f32               X = 25, Y = 25;
 
-
   texture*          FilledHeartTexture   = GetTextureByName(GameState, "filledHeart");
   texture*          UnfilledHeartTexture = GetTextureByName(GameState, "unfilledHeart");
 
   // ToDo find somewhere else?
-  s32 MaxHealth     = 3;
-  u32 SizeModifier  = 2;
-  f32 XOffset       = 20.0f * SizeModifier;
+  s32 MaxHealth    = 3;
+  u32 SizeModifier = 2;
+  f32 XOffset      = 20.0f * SizeModifier;
   for (s32 HealthIndex = 0; HealthIndex < Health->Health; HealthIndex++)
   {
     vec2f Origin = {};
@@ -814,21 +810,16 @@ void HandleEnemyShooting(game_state* GameState)
 
       type_component     Type     = {};
       Type.Type                   = EntityType_Bullet_Enemy;
-      health_component Health = {};
-      Health.Health = 1;
+      health_component Health     = {};
+      Health.Health               = 1;
       EntityManager_AddComponents(&GameState->EntityManager, Bullet, BulletMask, 6, &Health, &Position, &Velocity, &Render, &Collider, &Type);
       Shoot->TimeToShoot = GetNextShootTime(GameState->CommandBuffer.Time);
     }
   }
 }
 
-
-
-GAME_UPDATE(GameUpdate)
+void SimulateGame(game_state* GameState, game_memory* Memory, game_input* Input, pushbuffer* Pushbuffer)
 {
-
-  game_state* GameState = (game_state*)Memory->PermanentStorage;
-  Assert(GameState->CommandBuffer.Time >= 0);
   GameState->DeltaTime = Memory->DeltaTime;
   GameState->Score += GameState->DeltaTime * 1000;
   Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
@@ -850,7 +841,6 @@ GAME_UPDATE(GameUpdate)
     GameState->CommandBuffer.Commands     = Arena_Allocate(&GameState->PermanentArena, sizeof(command) * GameState->CommandBuffer.MaxCommands);
     GameState->CommandBuffer.CommandCount = 0;
 
-
     String_Create(&GameState->PermanentArena, &GameState->ScoreString, 128);
     CommandBuffer_PushDecideSpawn(&GameState->CommandBuffer, 0, 5);
 
@@ -864,7 +854,7 @@ GAME_UPDATE(GameUpdate)
   // Omega slow :)
   // Arena_Clear(&GameState->TemporaryArena);
 
-  #if 1
+#if 1
   UseInput(GameState, Input);
   ExecuteNewCommands(GameState);
   UpdatePhysics(GameState);
@@ -874,12 +864,45 @@ GAME_UPDATE(GameUpdate)
 
   RenderObjects(GameState, Pushbuffer);
   RenderHealth(GameState, Pushbuffer);
-  #endif
+#endif
 
-  string * ScoreString = &GameState->ScoreString;
-  ScoreString->Length = sprintf_s((char *)ScoreString->Buffer, ScoreString->Allocated, "Score: %d", (u32)(GameState->Score / 1000.0f));
-  Pushbuffer_PushText(Pushbuffer, ScoreString, &GameState->Font, UI_Text_Alignment_Centered, V2f(GameState->ScreenWidth * 0.80f, GameState->ScreenHeight * 0.05f), 40, 0x00FF0000);
+  string* ScoreString = &GameState->ScoreString;
+  ScoreString->Length = sprintf_s((char*)ScoreString->Buffer, ScoreString->Allocated, "Score: %d", (u32)(GameState->Score / 1000.0f));
+  Pushbuffer_PushText(Pushbuffer, ScoreString, &GameState->Font, UI_TextAlignment_Centered, V2f(GameState->ScreenWidth * 0.80f, GameState->ScreenHeight * 0.05f), 40, 0x00FF0000);
+}
 
+GAME_UPDATE(GameUpdate)
+{
+
+  game_state* GameState = (game_state*)Memory->PermanentStorage;
+  switch (GameState->State)
+  {
+  case GameState_MainMenu:
+  {
+    break;
+  }
+  case GameState_InputName:
+  {
+    // Check whether the score is actually a highscore?
+        // if so 
+          // Create score text
+          // Create ui input
+          // Create ui continue button
+        // else
+        //  send straight to show highscore / end
+    break;
+  }
+  case GameState_GameRunning:
+  {
+    // Check if we're in main menu, running game, input name, end game
+    SimulateGame(GameState, Memory, Input, Pushbuffer);
+    break;
+  }
+  case GameState_ShowHighscore:
+  {
+    break;
+  }
+  }
 }
 
 #include <math.h>

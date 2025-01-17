@@ -127,7 +127,7 @@ void Win32_Render(win32_renderer_gl * Renderer, pushbuffer* Pushbuffer)
             (f32)Entry.Size);
 
         // Figure out where the text is placed
-        Assert(Entry.Alignment == UI_Text_Alignment_Centered);
+        Assert(Entry.Alignment == UI_TextAlignment_Centered);
         vec2f Offset = Win32_TransformSSToCS(Renderer, V2f(
             Entry.Position.X - 0.5f * LetterSize.X * Entry.Text->Length,
             Entry.Position.Y - 0.5f * Entry.Size

@@ -142,7 +142,7 @@ void Software_Renderer_Render(software_renderer* Renderer, pushbuffer* Pushbuffe
       u32 TextColor    = Entry.Color;
 
       // ToDo These should be based on alignment!
-      Assert(Entry.Alignment == UI_Text_Alignment_Centered);
+      Assert(Entry.Alignment == UI_TextAlignment_Centered);
       s32 YOffset = (u32)(Entry.Position.Y - 0.5f * Entry.Size);
 
       u32 HeightOfLetter  = Entry.Size;

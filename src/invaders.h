@@ -3,8 +3,8 @@
 
 #include "common.h"
 #include "entity.h"
-#include "ui.h"
 #include "sound.h"
+#include "ui.h"
 #include "vector.h"
 
 typedef enum command_type
@@ -29,10 +29,20 @@ typedef struct command_buffer
   u32      CommandCount;
 } command_buffer;
 
+typedef enum game_state_type
+{
+  GameState_GameRunning,
+  GameState_MainMenu,
+  GameState_InputName,
+  GameState_ShowHighscore
+} game_state_type;
+
 #define MAX_SOUND_COUNT         16
 #define MAX_PLAYING_SOUND_COUNT 16
 typedef struct game_state
 {
+
+  game_state_type State;
   arena          PermanentArena;
   arena          TemporaryArena;
 

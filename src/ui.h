@@ -2,14 +2,8 @@
 #define UI_H
 
 #include "common.h"
+#include "math.h"
 #include "vector.h"
-
-// StartFrame()
-// PushLayout()
-// PopLayout()
-// UI_Button()
-// UI_Input()
-// EndFrame()
 
 typedef struct msdf_font
 {
@@ -23,14 +17,19 @@ typedef struct msdf_font
 
 typedef enum ui_text_alignment
 {
-  UI_Text_Alignment_Centered,
-  UI_Text_Alignment_Start_At,
-  UI_Text_Alignment_End_At,
+  UI_TextAlignment_Centered,
+  UI_TextAlignment_StartAt,
+  UI_TextAlignment_EndAt,
 } ui_text_alignment;
 
 typedef enum ui_widget_flags
 {
-  UI_WidgetFlag_Clickable = (1 << 0),
+  UI_WidgetFlag_Clickable      = (1 << 0),
+  UI_WidgetFlag_AnimateHover   = (1 << 1),
+  UI_WidgetFlag_AnimateClick   = (1 << 1),
+  UI_WidgetFlag_Input          = (1 << 2),
+  UI_WidgetFlag_DrawBackground = (1 << 3),
+  UI_WidgetFlag_DrawText       = (1 << 4)
 } ui_widget_flags;
 
 typedef enum ui_size_kind
@@ -49,55 +48,89 @@ typedef struct ui_size
   f32          Strictness;
 } ui_size;
 
-enum ui_axis2
+typedef enum ui_axis2
 {
   Axis2_X,
   Axis2_Y,
   Axis2_Count
-};
-
-typedef struct ui_persistent_data
-{
-  f32    ActiveT;
-  f32    HotT;
-  string Input;
-} ui_persistent_data;
+} ui_axis2;
 
 typedef struct ui_widget ui_widget;
 struct ui_widget
 {
-  u64             Key;
-  ui_widget*      First;
-  ui_widget*      Last;
-  ui_widget*      Next;
-  ui_widget*      Prev;
-  ui_widget*      Parent;
-  ui_widget_flags Flags;
+  // links
+  u64        Key;
+  ui_widget* First;
+  ui_widget* Last;
+  ui_widget* Next;
+  ui_widget* Prev;
+  ui_widget* Parent;
 
-  ui_size         SemanticSize[Axis2_Count];
+  // per build data
+  // On Creation data
+  string            String;   // This is fine to be temporary, or not, this might be persitent?
+  f32               FontSize; // Described in units 0-100?
+  msdf_font*        Font;
+  ui_axis2          ChildLayoutAxis;
+  ui_widget_flags   Flags;
+  ui_text_alignment TextAlignment;
+  float             Padding;
+  rect2             FixedRect; // The initial position of the widget
 
-  vec2f           ComputedRelPosition; // Position relative to parent
-  vec2f           ComputedSize;        // Position computed in pixels
+  // Dependent on Parent
+  vec2f ComputedRelPosition; // Position relative to parent
 
-  string          Text;
-  vec2f           Origin, Extents; // The on-screen rectangular coordinates taking Computed values above into account
+  // Final position
+  rect2 FinalRect;      // The on-screen rectangular coordinates taking Computed values above into account
+  f32   FontSizeScreen; // FontSize on the screen
+
+  // persistent data
+  // This includes String for input
+  u64 LastFrameActive;
+  f32 ActiveT;
 };
 
 typedef struct ui_comm
 {
-  bool Clicked;
+  bool Released;
+  bool Pressed;
   bool Hovered;
 } ui_comm;
 
-typedef struct ui_layout
+typedef struct ui_widget_pool
 {
-  vec2f Origin, Extents;
-} ui_layout;
+  ui_widget* Head;
+} ui_widget_pool;
 
-typedef struct ui
+typedef struct input_event input_event;
+
+// Have a stack of each type of thing you want to push
+// TextAlign
+// ChildLayoutAxis
+// Font
+// FontSize
+
+typedef struct ui_state
 {
-  ui_layout Layouts[16];
-  u32       LayoutCount;
-} ui;
+  arena          BuildArena;
+  arena          PrevFrameArena;
+
+  u64            Frame;
+  ui_widget*     TopOfHierarchy; // This is the top of the hierarchy
+  ui_widget*     PersistentData;
+  ui_widget*     Parent; // Parents
+
+  vec2f          MousePosition;
+  input_event*   Input;
+  u32            InputCount;
+
+  pool_allocator WidgetPool;
+
+  ui_widget*     WidgetSizeHead;
+  ui_widget*     TextAlignHead;
+  ui_widget*     ChildLayoutAxisHead;
+  ui_widget*     FontHead;
+  ui_widget*     FontSizeHead;
+} ui_state;
 
 #endif
