@@ -6,12 +6,12 @@
 
 #define MOUSE_BUTTON_LEFT 0
 
-typedef struct input_event
+typedef struct os_event
 {
   u8 Key;
   u8 WasDown;
   u8 IsDown;
-} input_item;
+} os_event;
 
 typedef struct game_memory
 {
@@ -43,8 +43,8 @@ typedef struct game_audio
 typedef struct game_input
 {
   vec2f      MousePosition;
-  input_item Input[32];
-  u32        InputCount;
+  os_event   Events[32];
+  u32        EventCount;
   u32        Up;
   u32        Left;
   u32        Right;

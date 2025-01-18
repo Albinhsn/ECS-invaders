@@ -6,7 +6,7 @@
 #include "sound.c"
 #include "vector.c"
 #include <math.h>
-
+#include "ui.c"
 sound* GetSoundByName(game_state* GameState, const char* SoundName)
 {
   string Name = {};
@@ -823,6 +823,7 @@ void SimulateGame(game_state* GameState, game_memory* Memory, game_input* Input,
   GameState->DeltaTime = Memory->DeltaTime;
   GameState->Score += GameState->DeltaTime * 1000;
   Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
+
   if (!Memory->IsInitialized)
   {
     // Initialize GameArena
@@ -879,12 +880,27 @@ GAME_UPDATE(GameUpdate)
   {
   case GameState_MainMenu:
   {
+    // Push Clear
+    UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
+    // Push
+    //  * Rect for the 3 buttons
+    //  * ChildLayout
+    //  * SizeKind of Percent Of Parent
+    //  * Pref Width
+
+
+    // For each button
+    // Push Button
+    // Push Spacer (except the last one)
+
+    // Pop the things
+    UI_EndFrame();
     break;
   }
   case GameState_InputName:
   {
     // Check whether the score is actually a highscore?
-        // if so 
+        // if so
           // Create score text
           // Create ui input
           // Create ui continue button
@@ -896,6 +912,8 @@ GAME_UPDATE(GameUpdate)
   {
     // Check if we're in main menu, running game, input name, end game
     SimulateGame(GameState, Memory, Input, Pushbuffer);
+    UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
+
     break;
   }
   case GameState_ShowHighscore:
@@ -903,6 +921,7 @@ GAME_UPDATE(GameUpdate)
     break;
   }
   }
+  UI_EndFrame();
 }
 
 #include <math.h>

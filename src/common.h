@@ -21,7 +21,7 @@ typedef double   f64;
 #define false             0
 
 #define bool              u32
-#define PI 3.141592653589793f
+#define PI                3.141592653589793f
 
 #define Kilobyte(size)    (size * 1024LL)
 #define Megabyte(size)    (Kilobyte(size) * 1024LL)
@@ -67,11 +67,10 @@ typedef struct string
 
 void String_Create(arena* Arena, string* String, u32 Length)
 {
-  String->Buffer = (u8*)Arena_Allocate(Arena, Length);
-  String->Length = 0;
+  String->Buffer    = (u8*)Arena_Allocate(Arena, Length);
+  String->Length    = 0;
   String->Allocated = Length;
 }
-
 
 typedef struct texture texture;
 struct texture
@@ -103,7 +102,6 @@ void Memcpy(u8* Dest, u8* Src, u32 Count)
     Dest[BufferIndex] = Src[BufferIndex];
   }
 }
-
 
 bool IsDigit(u8 Char)
 {
@@ -144,6 +142,13 @@ bool String_Compare(string* s0, string* s1)
   }
   return true;
 }
+void String_Build(arena* Arena, string* String, const char* Text)
+{
+  String->Length = String_Length((u8*)Text);
+  String->Buffer = (u8*)Arena_Allocate(Arena, String->Length * sizeof(u8));
+  Memcpy(String->Buffer, (u8*)Text, String->Length);
+}
+
 
 void* Pool_Alloc(pool_allocator* Pool)
 {
@@ -230,8 +235,6 @@ void Arena_Deallocate(arena* Arena, u64 Size)
   OutputDebugStringA(Buffer);
 }
 
-
-
 void Arena_Reset(arena* Arena)
 {
   Arena->Offset = 0;
@@ -246,13 +249,14 @@ void Arena_Clear(arena* Arena)
   }
 }
 
-typedef struct file_buffer{
-  u8 * Buffer;
+typedef struct file_buffer
+{
+  u8* Buffer;
   u32 Length;
   u32 Index;
-}file_buffer;
+} file_buffer;
 
-u16 FileBuffer_ParseU16BE(file_buffer * Buffer)
+u16 FileBuffer_ParseU16BE(file_buffer* Buffer)
 {
   Assert(Buffer->Index + sizeof(u16) <= Buffer->Length); // Assume that the string i null terminated as well, so file content == Length
 
@@ -262,7 +266,7 @@ u16 FileBuffer_ParseU16BE(file_buffer * Buffer)
   return htons(Result);
 }
 
-u32 FileBuffer_ParseU32BE(file_buffer * Buffer)
+u32 FileBuffer_ParseU32BE(file_buffer* Buffer)
 {
   Assert(Buffer->Index + sizeof(u16) <= Buffer->Length);
 
@@ -271,7 +275,7 @@ u32 FileBuffer_ParseU32BE(file_buffer * Buffer)
 
   return htonl(Result);
 }
-u32 FileBuffer_ParseU32(file_buffer * Buffer)
+u32 FileBuffer_ParseU32(file_buffer* Buffer)
 {
   Assert(Buffer->Index + sizeof(u16) <= Buffer->Length);
 
@@ -281,7 +285,7 @@ u32 FileBuffer_ParseU32(file_buffer * Buffer)
   return Result;
 }
 
-u16 FileBuffer_ParseU16(file_buffer * Buffer)
+u16 FileBuffer_ParseU16(file_buffer* Buffer)
 {
   Assert(Buffer->Index + sizeof(u16) <= Buffer->Length);
 
@@ -291,7 +295,7 @@ u16 FileBuffer_ParseU16(file_buffer * Buffer)
   return Result;
 }
 
-u8 FileBuffer_ParseU8(file_buffer * Buffer)
+u8 FileBuffer_ParseU8(file_buffer* Buffer)
 {
   Assert(Buffer->Index + sizeof(u8) <= Buffer->Length);
 
@@ -300,42 +304,45 @@ u8 FileBuffer_ParseU8(file_buffer * Buffer)
 
   return Result;
 }
-s32 FileBuffer_ParseS24(file_buffer * Buffer)
+s32 FileBuffer_ParseS24(file_buffer* Buffer)
 {
   Assert(Buffer->Index + sizeof(u16) + sizeof(u8) <= Buffer->Length);
 
-  u8 B0 = FileBuffer_ParseU8(Buffer);
-  u8 B1 = FileBuffer_ParseU8(Buffer);
-  u8 B2 = FileBuffer_ParseU8(Buffer);
+  u8  B0     = FileBuffer_ParseU8(Buffer);
+  u8  B1     = FileBuffer_ParseU8(Buffer);
+  u8  B2     = FileBuffer_ParseU8(Buffer);
   s32 Result = (B0 << 8) | (B1 << 16) | (B2 << 24);
   Result >>= 8;
 
   return Result;
 }
 
-void FileBuffer_Advance(file_buffer * Buffer, u32 Count)
+void FileBuffer_Advance(file_buffer* Buffer, u32 Count)
 {
   Buffer->Index += Count;
 }
 
-u8 FileBuffer_Current(file_buffer * Buffer){
+u8 FileBuffer_Current(file_buffer* Buffer)
+{
   return Buffer->Buffer[Buffer->Index];
 }
 
-#define FileBuffer_ParseStruct(Buf, Struct) (Struct*)((Buf)->Buffer + (Buf)->Index);FileBuffer_Advance((Buf), sizeof(Struct))
+#define FileBuffer_ParseStruct(Buf, Struct)                                                                                                                                                            \
+  (Struct*)((Buf)->Buffer + (Buf)->Index);                                                                                                                                                             \
+  FileBuffer_Advance((Buf), sizeof(Struct))
 
-s32  FileBuffer_ParseInt(file_buffer * Buffer)
+s32 FileBuffer_ParseInt(file_buffer* Buffer)
 {
-  bool Sign = false;
-  s32 Result = 0;
+  bool Sign   = false;
+  s32  Result = 0;
 
-  if(FileBuffer_Current(Buffer) == '-')
+  if (FileBuffer_Current(Buffer) == '-')
   {
     FileBuffer_Advance(Buffer, 1);
     Sign = true;
   }
 
-  while(IsDigit(FileBuffer_Current(Buffer)))
+  while (IsDigit(FileBuffer_Current(Buffer)))
   {
     Result *= 10;
     Result += FileBuffer_Current(Buffer) - '0';
@@ -345,23 +352,21 @@ s32  FileBuffer_ParseInt(file_buffer * Buffer)
   return Sign ? Result * -1 : Result;
 }
 
-void FileBuffer_ParseString(file_buffer * Buffer, string * String)
+void FileBuffer_ParseString(file_buffer* Buffer, string* String)
 {
   // ToDo improve this?
   u32 StartOfString = Buffer->Index;
-  String->Buffer = &Buffer->Buffer[Buffer->Index];
-  while(FileBuffer_Current(Buffer) != '\n' && FileBuffer_Current(Buffer) != ' ')
+  String->Buffer    = &Buffer->Buffer[Buffer->Index];
+  while (FileBuffer_Current(Buffer) != '\n' && FileBuffer_Current(Buffer) != ' ')
   {
     FileBuffer_Advance(Buffer, 1);
   }
 
   String->Length = Buffer->Index - StartOfString;
-
-
 }
-void FileBuffer_SkipWhitespace(file_buffer * Buffer)
+void FileBuffer_SkipWhitespace(file_buffer* Buffer)
 {
-  while(FileBuffer_Current(Buffer) == '\n' || FileBuffer_Current(Buffer) == ' ')
+  while (FileBuffer_Current(Buffer) == '\n' || FileBuffer_Current(Buffer) == ' ')
   {
     FileBuffer_Advance(Buffer, 1);
   }

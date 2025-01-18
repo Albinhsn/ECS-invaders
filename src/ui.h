@@ -22,15 +22,52 @@ typedef enum ui_text_alignment
   UI_TextAlignment_EndAt,
 } ui_text_alignment;
 
-typedef enum ui_widget_flags
+/*
+GOALS
+* When using the API to build a ui it should:
+  * Have simple to use function calls to create a node, this includes
+    * Creating "components" like button etc
+    * Creating a new subspace that have some properties
+      * This includes defining how it's children are supposed to be:
+        * Which direction to grow
+        * Sized
+        * Take up the space
+        * Padding/Spacing between them
+        * What happens if/when we extend the bounds?
+      * As well as for yourself
+        * The percentage space of parent you occupy or something else?
+    * It should in general feel like creating a </div>
+  * It's fine if the flags and widget creation are per project basis
+    * This because writing say a "general" native app vs a game has different constraints
+    * This does mean that "cores core" should remains throughout projects
+* Assumption is made that features such as animating hover is the same across all components?
+  * Some can be carried over (such as hover/click etc) but can also just be rewritten per project
+*/
+
+typedef enum ui_box_flags
 {
-  UI_WidgetFlag_Clickable      = (1 << 0),
-  UI_WidgetFlag_AnimateHover   = (1 << 1),
-  UI_WidgetFlag_AnimateClick   = (1 << 1),
-  UI_WidgetFlag_Input          = (1 << 2),
-  UI_WidgetFlag_DrawBackground = (1 << 3),
-  UI_WidgetFlag_DrawText       = (1 << 4)
-} ui_widget_flags;
+  // Interactions
+  UI_BoxFlag_Clickable = (1 << 0),
+  UI_BoxFlag_Scroll   =  (1 << 1),
+  // Layout
+  UI_BoxFlag_FixedWidth=  (1 << 2),
+  UI_BoxFlag_FixedHeight=  (1 << 3),
+  UI_BoxFlag_AllowOverflow=  (1 << 4), // Use this for highscore just  because?
+
+  // Appearance / Animation
+  UI_BoxFlag_HoverAnimation = (1 << 5),
+  UI_BoxFlag_DrawText = (1 << 6),
+  UI_BoxFlag_DrawBackground= (1 << 7),
+  UI_BoxFlag_DrawBorder=  (1 << 8),
+
+}ui_box_flags;
+
+typedef enum axis2
+{
+  Axis2_X,
+  Axis2_Y,
+  Axis2_Count
+}axis2;
 
 typedef enum ui_size_kind
 {
@@ -41,96 +78,97 @@ typedef enum ui_size_kind
   UI_SizeKind_ChildrenSum,
 } ui_size_kind;
 
-typedef struct ui_size
+typedef struct ui_box ui_box;
+struct ui_box
 {
-  ui_size_kind kind;
-  f32          Value;
-  f32          Strictness;
-} ui_size;
+  // Links
+  ui_box * First;
+  ui_box * Last;
+  ui_box * Next;
+  ui_box * Prev;
+  ui_box * Parent;
+  u64      ChildCount;
 
-typedef enum ui_axis2
-{
-  Axis2_X,
-  Axis2_Y,
-  Axis2_Count
-} ui_axis2;
 
-typedef struct ui_widget ui_widget;
-struct ui_widget
-{
-  // links
-  u64        Key;
-  ui_widget* First;
-  ui_widget* Last;
-  ui_widget* Next;
-  ui_widget* Prev;
-  ui_widget* Parent;
+  // Per build equipment
+  u64 Key;
+  ui_box_flags Flags;
+  string String;
+  ui_text_alignment TextAligment;
+  vec2f FixedPosition;
+  vec2f FixedSize;
+  vec2f PrefSize;
+  axis2 ChildLayoutAxis;
+  msdf_font * Font;
+  f32 FontSize;
 
-  // per build data
-  // On Creation data
-  string            String;   // This is fine to be temporary, or not, this might be persitent?
-  f32               FontSize; // Described in units 0-100?
-  msdf_font*        Font;
-  ui_axis2          ChildLayoutAxis;
-  ui_widget_flags   Flags;
-  ui_text_alignment TextAlignment;
-  float             Padding;
-  rect2             FixedRect; // The initial position of the widget
+  // Per build artifacts
+  ui_size_kind SizeKind;
+  rect2 Rect; // This defines the space it wants to operate in
 
-  // Dependent on Parent
-  vec2f ComputedRelPosition; // Position relative to parent
-
-  // Final position
-  rect2 FinalRect;      // The on-screen rectangular coordinates taking Computed values above into account
-  f32   FontSizeScreen; // FontSize on the screen
-
-  // persistent data
-  // This includes String for input
-  u64 LastFrameActive;
-  f32 ActiveT;
+  // Persistent data
+  u64 FirstTouchedBuildIndex;
+  u64 LastTouchedBuildIndex;
+  f32 HotT;
 };
 
-typedef struct ui_comm
+
+
+typedef enum ui_signal_flags
 {
-  bool Released;
-  bool Pressed;
-  bool Hovered;
-} ui_comm;
+  UI_SignalFlag_LeftPressed =  (1 << 0),
+  UI_SignalFlag_LeftClicked =  (1 << 1),
+  UI_SignalFlag_Hovered     =  (1 << 2)
+}ui_signal_flags;
 
-typedef struct ui_widget_pool
+typedef struct ui_signal
 {
-  ui_widget* Head;
-} ui_widget_pool;
+  ui_box * Box;
+  ui_signal_flags Flags;
+}ui_signal;
 
-typedef struct input_event input_event;
+typedef struct ui_child_layout_node ui_child_layout_node;
+struct ui_child_layout_node {ui_child_layout_node * Next; ui_box * Box;};
 
-// Have a stack of each type of thing you want to push
-// TextAlign
-// ChildLayoutAxis
-// Font
-// FontSize
+typedef struct ui_text_alignment_node ui_text_alignment_node;
+struct ui_text_alignment_node {ui_text_alignment_node * Next; ui_box * Box;};
 
+typedef struct ui_text_size_node ui_text_size_node;
+struct ui_text_size_node {ui_text_size_node * Next; ui_box * Box;};
+
+typedef struct ui_text_color_node ui_text_color_node;
+struct ui_text_color_node {ui_text_color_node * Next; ui_box * Box;};
+
+typedef struct ui_border_color_node ui_border_color_node;
+struct ui_border_color_node {ui_border_color_node * Next; ui_box * Box;};
+
+typedef struct ui_rect_node ui_rect_node;
+struct ui_rect_node {ui_rect_node * Next; ui_box * Box;};
+
+typedef struct os_event os_event;
 typedef struct ui_state
 {
-  arena          BuildArena;
-  arena          PrevFrameArena;
-
-  u64            Frame;
-  ui_widget*     TopOfHierarchy; // This is the top of the hierarchy
-  ui_widget*     PersistentData;
-  ui_widget*     Parent; // Parents
-
-  vec2f          MousePosition;
-  input_event*   Input;
-  u32            InputCount;
 
   pool_allocator WidgetPool;
+  arena BuildArenas[2];
+  u64   BuildIndex;
 
-  ui_widget*     WidgetSizeHead;
-  ui_widget*     TextAlignHead;
-  ui_widget*     ChildLayoutAxisHead;
-  ui_widget*     FontHead;
-  ui_widget*     FontSizeHead;
-} ui_state;
+  // Build output
+  ui_box * Root;
+
+  // build parameters
+  os_event * Events;
+  u32        EventCount;
+  vec2f      MousePosition;
+  f32        DeltaTime;
+
+  // Build stacks
+  ui_child_layout_node *   ChildLayoutHead;
+  ui_text_alignment_node * TextAlignmentHead;
+  ui_text_size_node *      TextSizeHead;
+  ui_text_color_node          * TextColorHead;
+  ui_border_color_node          * BorderColorHead;
+}ui_state;
+
 
 #endif
