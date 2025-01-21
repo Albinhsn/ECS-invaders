@@ -7,6 +7,12 @@
 #include "ui.h"
 #include "vector.h"
 
+typedef struct highscore
+{
+  string * Name;
+  u32      Score;
+} highscore;
+
 typedef enum command_type
 {
   Command_SpawnEnemy,  // Needs the EntityManager
@@ -45,7 +51,7 @@ typedef struct game_state
   game_state_type State;
   arena          PermanentArena;
   arena          TemporaryArena;
-
+  highscore *    Highscores;
   entity_manager EntityManager;
   entity         PlayerEntity;
   texture*       Textures;

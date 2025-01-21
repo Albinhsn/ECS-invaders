@@ -6,6 +6,7 @@
 #include "sound.c"
 #include "vector.c"
 #include <math.h>
+
 #include "ui.c"
 sound* GetSoundByName(game_state* GameState, const char* SoundName)
 {
@@ -881,31 +882,77 @@ GAME_UPDATE(GameUpdate)
   case GameState_MainMenu:
   {
     // Push Clear
+    Pushbuffer_PushClear(Pushbuffer, 0x0);
     UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
-    // Push
-    //  * Rect for the 3 buttons
-    //  * ChildLayout
-    //  * SizeKind of Percent Of Parent
-    //  * Pref Width
 
 
-    // For each button
-    // Push Button
-    // Push Spacer (except the last one)
+    // Define screen space
+    UI_FillHeight()
+    UI_PrefWidth(0.6f)
+    UI_ChildLayoutAxis(Axis2_Y)
+    UI_Padding(0.15f)
+    {
 
-    // Pop the things
+      UI_Text("Invaders");
+
+      // Three main buttons
+      UI_PrefWidth(0.8f)
+      UI_PrefHeight(0.15f)
+      UI_Padding(0.1f)
+      {
+        if(UI_Button("START").Flags & UI_SignalFlag_LeftClicked)
+        {
+          GameState->State = GameState_GameRunning;
+        }
+
+        UI_Spacer(0.05f);
+        if(UI_Button("HIGHSCORE").Flags & UI_SignalFlag_LeftClicked)
+        {
+          GameState->State = GameState_ShowHighscore;
+        }
+
+        UI_Spacer(0.05f);
+        if(UI_Button("QUIT").Flags & UI_SignalFlag_LeftClicked)
+        {
+          Assert(0);
+        }
+      }
+    }
     UI_EndFrame();
+    break;
+  }
+  case GameState_ShowHighscore:
+  {
+    UI_BeginFrame();
+    
     break;
   }
   case GameState_InputName:
   {
-    // Check whether the score is actually a highscore?
-        // if so
+    Pushbuffer_PushClear(Pushbuffer, 0x0);
+    UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
+    highscore *Highscores = GameState->Highscores;
+    if(Highscores == 0)
+    {
+      // Load highscores
+      // How do we deal with memory here?
+      LoadHighscores(GameState->PermanentArena, Highscores);
+    }
+
+    if(GameState->Highscores)
+    {
+      bool IsNewEntry = true;
+      if(IsNewEntry)
+      {
           // Create score text
           // Create ui input
           // Create ui continue button
-        // else
-        //  send straight to show highscore / end
+      }
+      else
+      {
+        GameState->State = GameState_ShowHighscore;
+      }
+    }
     break;
   }
   case GameState_GameRunning:
@@ -913,11 +960,17 @@ GAME_UPDATE(GameUpdate)
     // Check if we're in main menu, running game, input name, end game
     SimulateGame(GameState, Memory, Input, Pushbuffer);
     UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
-
+    // Show score text
+    // Render Health (but not via ui!)
     break;
   }
   case GameState_ShowHighscore:
   {
+    Pushbuffer_PushClear(Pushbuffer, 0x0);
+    UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
+
+    // Draw highscores
+    // Draw back button
     break;
   }
   }

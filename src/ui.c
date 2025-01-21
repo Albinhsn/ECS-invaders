@@ -4,6 +4,17 @@ ui_state * UI;
 
 #define UI_Arena (UI->BuildArenas[0])
 
+axis2 UI_PushChildLayoutAxis(axis2 Axis){return Axis;}
+void  UI_PopChildLayoutAxis(){}
+float UI_PushPadding(float Padding){return Padding;}
+void  UI_PopPadding(){}
+float UI_PushPrefWidth(float Width){return Width;}
+void  UI_PopPrefWidth(){}
+float UI_PushPrefHeight(float Height){return Height;}
+void  UI_PopPrefHeight(){}
+ui_box * UI_PushParent(){return 0;}
+ui_box * UI_PopParent(){return 0;}
+
 void UI_Init(void * Memory, u64 MemorySize, u32 MaxWidgetCount)
 {
   arena Arena = {};
@@ -19,15 +30,7 @@ void UI_Init(void * Memory, u64 MemorySize, u32 MaxWidgetCount)
 
 u64 UI_KeyFromString(string String)
 {
-  return 0;
-}
-
-ui_box * UI_PushParent(ui_box * Box)
-{
-  return 0;
-}
-ui_box * UI_PopParent()
-{
+  // ToDo Keep in mind this have to check for hash!
   return 0;
 }
 
@@ -55,7 +58,18 @@ void UI_EndFrame()
 {
 }
 
+
 ui_signal UI_BoxGetSignal(ui_box * Box)
+{
+  return (ui_signal){};
+}
+
+ui_signal UI_Spacer(float Space)
+{
+  return (ui_signal){};
+}
+
+ui_signal UI_Text(const char * Text)
 {
   return (ui_signal){};
 }
@@ -76,6 +90,24 @@ ui_signal UI_Button(const char * Text)
 
   return Signal;
 }
+// ToDo implement!!!
+ui_signal UI_ButtonF(const char * Text, ...)
+{
+  string String = {};
+  String_Build(&UI_Arena, &String, Text);
+
+  ui_box * Box = UI_BoxMake(UI_BoxFlag_Clickable     |
+                               UI_BoxFlag_DrawText      |
+                               UI_BoxFlag_DrawBorder    |
+                               UI_BoxFlag_DrawBackground|
+                               UI_BoxFlag_HoverAnimation,
+                               String
+      );
+  ui_signal Signal = UI_BoxGetSignal(Box);
+
+  return Signal;
+}
+
 
 void UI_PushRect(rect2 Rect)
 {

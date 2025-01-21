@@ -2,25 +2,18 @@
 #define UI_H
 
 #include "common.h"
-#include "math.h"
 #include "vector.h"
+#include "math.h"
 
-typedef struct msdf_font
-{
-  texture Texture;
-  u16     Columns, Rows;
-  u16     WidthPerCell;
-  u16     HeightPerCell;
-  u16     GlyphCount;
+#define UI_FillHeight()
+#define UI_FillWidth()
 
-} msdf_font;
 
-typedef enum ui_text_alignment
-{
-  UI_TextAlignment_Centered,
-  UI_TextAlignment_StartAt,
-  UI_TextAlignment_EndAt,
-} ui_text_alignment;
+#define UI_ChildLayoutAxis(Axis) DeferLoop(UI_PushChildLayoutAxis(Axis), UI_PopChildLayoutAxis())
+#define UI_Padding(Padding) DeferLoop(UI_PushPadding(Padding), UI_PopPadding())
+#define UI_PrefWidth(Width) DeferLoop(UI_PushPrefWidth(Width), UI_PopPrefWidth())
+#define UI_PrefHeight(Height) DeferLoop(UI_PushPrefHeight(Height), UI_PopPrefHeight())
+
 
 /*
 GOALS
@@ -44,6 +37,25 @@ GOALS
   * Some can be carried over (such as hover/click etc) but can also just be rewritten per project
 */
 
+
+typedef struct msdf_font
+{
+  texture Texture;
+  u16     Columns, Rows;
+  u16     WidthPerCell;
+  u16     HeightPerCell;
+  u16     GlyphCount;
+
+} msdf_font;
+
+typedef enum ui_text_alignment
+{
+  UI_TextAlignment_Centered,
+  UI_TextAlignment_StartAt,
+  UI_TextAlignment_EndAt,
+} ui_text_alignment;
+
+
 typedef enum ui_box_flags
 {
   // Interactions
@@ -59,7 +71,6 @@ typedef enum ui_box_flags
   UI_BoxFlag_DrawText = (1 << 6),
   UI_BoxFlag_DrawBackground= (1 << 7),
   UI_BoxFlag_DrawBorder=  (1 << 8),
-
 }ui_box_flags;
 
 typedef enum axis2
@@ -166,8 +177,8 @@ typedef struct ui_state
   ui_child_layout_node *   ChildLayoutHead;
   ui_text_alignment_node * TextAlignmentHead;
   ui_text_size_node *      TextSizeHead;
-  ui_text_color_node          * TextColorHead;
-  ui_border_color_node          * BorderColorHead;
+  ui_text_color_node    *  TextColorHead;
+  ui_border_color_node   * BorderColorHead;
 }ui_state;
 
 
