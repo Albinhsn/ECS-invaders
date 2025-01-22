@@ -51,11 +51,24 @@ void UI_BeginFrame(os_event * Events, u32 EventCount, f32 DeltaTime)
   UI->EventCount   = EventCount;
   // Reset and swap arenas
 
+
+
+  // Create root
+
+  // Prune boxes
+
   // Check that stacks have been popped!
+  // Push defaults
+}
+void UI_LayoutRoot(ui_box * Box, axis2 Axis)
+{
 }
 
 void UI_EndFrame()
 {
+  // Pop root
+
+
 }
 
 
