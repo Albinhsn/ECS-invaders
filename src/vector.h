@@ -14,6 +14,14 @@ typedef struct vec2f
   f32 Y;
 } vec2f;
 
+typedef struct vec4f
+{
+  f32 X;
+  f32 Y;
+  f32 Z;
+  f32 W;
+} vec4f;
+
 vec2i V2i(u32 X, u32 Y){
   return (vec2i){X, Y};
 }

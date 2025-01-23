@@ -28,6 +28,7 @@ typedef double   f64;
 #define Gigabyte(size)    (Megabyte(size) * 1024LL)
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
+
 #define Assert(Expr)                                                                                                                                                                                   \
   {                                                                                                                                                                                                    \
     if (!(Expr))                                                                                                                                                                                       \
@@ -40,6 +41,11 @@ typedef struct arena
   u64   Size;
   u64   Offset;
 } arena;
+
+inline void ZeroStruct(void * Struct, u64 Size)
+{
+  memset(Struct, 0, Size);
+}
 
 void* Arena_Allocate(arena* Arena, u64 Size)
 {

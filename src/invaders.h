@@ -45,13 +45,15 @@ typedef enum game_state_type
 
 #define MAX_SOUND_COUNT         16
 #define MAX_PLAYING_SOUND_COUNT 16
+#define MAX_HIGHSCORES          5
 typedef struct game_state
 {
 
   game_state_type State;
   arena          PermanentArena;
   arena          TemporaryArena;
-  highscore *    Highscores;
+  highscore      Highscores[MAX_HIGHSCORES];
+  u32            HighscoreCount;
   entity_manager EntityManager;
   entity         PlayerEntity;
   texture*       Textures;

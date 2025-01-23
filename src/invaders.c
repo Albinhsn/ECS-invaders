@@ -873,6 +873,11 @@ void SimulateGame(game_state* GameState, game_memory* Memory, game_input* Input,
   Pushbuffer_PushText(Pushbuffer, ScoreString, &GameState->Font, UI_TextAlignment_Centered, V2f(GameState->ScreenWidth * 0.80f, GameState->ScreenHeight * 0.05f), 40, 0x00FF0000);
 }
 
+void LoadHighscores(arena * Arena, highscore * Highscores, u32 * HighscoreCount)
+{
+}
+
+
 GAME_UPDATE(GameUpdate)
 {
 
@@ -921,12 +926,6 @@ GAME_UPDATE(GameUpdate)
     UI_EndFrame();
     break;
   }
-  case GameState_ShowHighscore:
-  {
-    UI_BeginFrame();
-    
-    break;
-  }
   case GameState_InputName:
   {
     Pushbuffer_PushClear(Pushbuffer, 0x0);
@@ -936,7 +935,7 @@ GAME_UPDATE(GameUpdate)
     {
       // Load highscores
       // How do we deal with memory here?
-      LoadHighscores(GameState->PermanentArena, Highscores);
+      LoadHighscores(&GameState->PermanentArena, Highscores, &GameState->HighscoreCount);
     }
 
     if(GameState->Highscores)

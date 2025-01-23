@@ -14,6 +14,12 @@
 #define UI_PrefWidth(Width) DeferLoop(UI_PushPrefWidth(Width), UI_PopPrefWidth())
 #define UI_PrefHeight(Height) DeferLoop(UI_PushPrefHeight(Height), UI_PopPrefHeight())
 
+#define UI_TopParent() 0
+#define UI_TopChildLayoutAxis() 0
+#define UI_TopTextAlignment() 0
+#define UI_TopFont() 0
+#define UI_TopFontSize() 0
+#define UI_TopFontColor() (vec4f){}
 
 /*
 GOALS
@@ -105,17 +111,25 @@ struct ui_box
   u64 Key;
   ui_box_flags Flags;
   string String;
-  ui_text_alignment TextAligment;
+
   vec2f FixedPosition;
   vec2f FixedSize;
   vec2f PrefSize;
   axis2 ChildLayoutAxis;
+  // Hoist this to something about text
   msdf_font * Font;
   f32 FontSize;
+  vec4f FontColor;
+  ui_text_alignment TextAlignment;
+  // Hoist this to something about rect
+  f32 BorderThickness;
+  vec4f BackgroundColor;
+  vec4f BorderColor;
 
   // Per build artifacts
   ui_size_kind SizeKind;
-  rect2 Rect; // This defines the space it wants to operate in
+  rect2        Rect; // This defines the space it wants to operate in
+  f32          CalcSize[Axis2_Count];
 
   // Persistent data
   u64 FirstTouchedBuildIndex;
@@ -172,6 +186,7 @@ typedef struct ui_state
   u32        EventCount;
   vec2f      MousePosition;
   f32        DeltaTime;
+  vec2f      WindowDim;
 
   // Build stacks
   ui_child_layout_node *   ChildLayoutHead;
