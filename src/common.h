@@ -1,9 +1,18 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#if PLATFORM_WINDOWS
 #include "windows.h"
+#elif PLATFORM_LINUX
+#include <arpa/inet.h>
+#include <string.h>
+#include <stdarg.h>
+#endif
+
 #include <stdint.h>
 #include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -28,11 +37,12 @@ typedef double   f64;
 #define Gigabyte(size)    (Megabyte(size) * 1024LL)
 #define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
 
+#define sprintf_s(buffer, ...) snprintf((buffer), __VA_ARGS__)
 
 #define Assert(Expr)                                                                                                                                                                                   \
   {                                                                                                                                                                                                    \
-    if (!(Expr))                                                                                                                                                                                       \
-      int a = *(int*)0;                                                                                                                                                                                \
+    if (!(Expr)){                                                                                                                                                                                       \
+      int a = *(int*)0;}                                                                                                                                                                                \
   }
 #define DeferLoop(begin, end) for(int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 typedef struct arena
@@ -57,9 +67,12 @@ void* Arena_Allocate(arena* Arena, u64 Size)
 
   void* Pointer = (void*)((u8*)Arena->Memory + Arena->Offset);
   Arena->Offset += Size;
+
+#if PLATFORM_WINDOWS
   char Buffer[1024] = {};
   sprintf_s(Buffer, ArrayCount(Buffer), "Allocated %lld out of %lld (%.2f)\n", Arena->Offset, Arena->Size, Arena->Offset / (f32)Arena->Size);
   OutputDebugStringA(Buffer);
+#endif
 
   return Pointer;
 }
@@ -236,9 +249,11 @@ void Arena_Deallocate(arena* Arena, u64 Size)
     Assert(0 && "Trying to deallocate past the offset?");
   }
   Arena->Offset -= Size;
+#if PLATFORM_WINDOWS
   char Buffer[1024] = {};
   sprintf_s(Buffer, ArrayCount(Buffer), "Deallocated, Allocated %lld out of %lld (%.2f)\n", Arena->Offset, Arena->Size, Arena->Offset / (f32)Arena->Size);
   OutputDebugStringA(Buffer);
+#endif
 }
 
 void Arena_Reset(arena* Arena)

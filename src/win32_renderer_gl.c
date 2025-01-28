@@ -583,8 +583,9 @@ void InitTextureVertexArray(win32_renderer_gl * Renderer)
   glBindVertexArray(0);
 }
 
-platform_renderer * CreateRenderer(u32 ScreenWidth, u32 ScreenHeight, HWND hwnd)
+platform_renderer * CreateRenderer(u32 ScreenWidth, u32 ScreenHeight, void * Window)
 {
+  HWND hwnd = (HWND)Window;
   HDC hdc = GetDC(hwnd);
 
   PIXELFORMATDESCRIPTOR Format  ={};

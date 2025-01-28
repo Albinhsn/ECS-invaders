@@ -54,8 +54,9 @@ void EndFrame(platform_renderer * PlatformRenderer, pushbuffer * Pushbuffer)
   Win32_RenderFramebuffer(Win32Renderer);
 }
 
-platform_renderer * CreateRenderer(u32 ScreenWidth, u32 ScreenHeight, HWND hwnd)
+platform_renderer * CreateRenderer(u32 ScreenWidth, u32 ScreenHeight, void * Window)
 {
+  HWND hwnd = (HWND)Window;
   u64 RendererMemorySize = sizeof(u32) * ScreenWidth * ScreenHeight;
   void * Memory = Win32_Allocate(RendererMemorySize + sizeof(win32_software_renderer));
   win32_software_renderer * Renderer = (win32_software_renderer*)Memory;

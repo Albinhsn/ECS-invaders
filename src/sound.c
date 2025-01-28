@@ -1,6 +1,8 @@
 #include "sound.h"
 
+#if 0
 #include <winsock.h>
+#endif
 #include <limits.h>
 
 

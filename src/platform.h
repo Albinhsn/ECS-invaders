@@ -68,7 +68,7 @@ typedef RENDERER_BEGIN_FRAME(renderer_begin_frame);
 #define RENDERER_END_FRAME(name) void name(platform_renderer* PlatformRenderer, pushbuffer* Pushbuffer)
 typedef RENDERER_END_FRAME(renderer_end_frame);
 
-#define RENDERER_CREATE(name) platform_renderer* name(u32 ScreenWidth, u32 ScreenHeight, HWND hwnd)
+#define RENDERER_CREATE(name) platform_renderer* name(u32 ScreenWidth, u32 ScreenHeight, void * Window)
 typedef RENDERER_CREATE(renderer_create);
 
 #define RENDERER_RELEASE(name) void name(platform_renderer* PlatformRenderer)
