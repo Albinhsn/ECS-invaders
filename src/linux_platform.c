@@ -6,15 +6,23 @@ static u16 GlobalScreenWidth  = 600;
 static u16 GlobalScreenHeight = 800;
 static bool GlobalRunning = true;
 static s64 GlobalPerfCountFrequency = 0;
+
+
+#if RENDERER_SOFTWARE
+static const char * GlobalRenderCodePath      = "./build/linux_renderer_software.so";
+#elif RENDERER_GL
+static const char * GlobalRenderCodePath      = "./build/linux_renderer_gl.so";
+#endif
+
+static const char * GlobalTempRenderCodePath  = "./build/lock_renderer.tmp";
+static const char * GlobalGameCodePath        = "./build/invaders.so";
+static const char * GlobalTempGameCodePath    = "./build/lock_game.tmp";
 Atom GlobalDeleteAtom;
 
 /*
   ToDo:
   * Platform
     * ALSA  (audio)
-    * Load game code
-    * Load render code
-    * Parse normal input
   * Renderer
     * Allocate memory
     * CreateRenderer
@@ -94,7 +102,7 @@ bool Linux_FileHasChanged(u64 * FileLastChangedTimer, const char * Filename)
   return false;
 }
 
-void* Linux_LoadLibrary(const char* Name)
+void* Linux_LibraryLoad(const char* Name)
 {
   void* Library = dlopen(Name, RTLD_NOW | RTLD_GLOBAL);
   if (Library == 0)
@@ -104,7 +112,7 @@ void* Linux_LoadLibrary(const char* Name)
   }
   return Library;
 }
-void Linux_FreeLibrary(void* Handle)
+void Linux_LibraryFree(void* Handle)
 {
   dlclose(Handle);
 }
@@ -153,7 +161,7 @@ bool Linux_ReadFile(arena * Arena, const char * Filename, u8** FileBuffer, u32 *
   return !FailedToMap;
 }
 
-void Linux_HandleEvents(Display * display)
+void Linux_HandleEvents(Display * display, game_input * Input)
 {
 
   XEvent event;
@@ -164,7 +172,129 @@ void Linux_HandleEvents(Display * display)
     {
       GlobalRunning = false;
     }
+    if(event.type == KeyPress)
+    {
+      switch(event.xkey.keycode)
+      {
+        case 25:
+          {
+            Input->Up = 1;
+            break;
+          }
+        case 38:
+          {
+            Input->Left = 1;
+            break;
+          }
+        case 39:
+          {
+            Input->Down = 1;
+            break;
+          }
+        case 40:
+          {
+            Input->Right = 1;
+            break;
+          }
+        case 65:
+          {
+            Input->Shoot = 1;
+            break;
+          }
+      }
+      printf("%d\n", event.xkey.keycode);
+
+
+    }
+    if(event.type == KeyRelease)
+    {
+      switch(event.xkey.keycode)
+      {
+        case 25:
+          {
+            Input->Up = 0;
+            break;
+          }
+        case 38:
+          {
+            Input->Left = 0;
+            break;
+          }
+        case 39:
+          {
+            Input->Down = 0;
+            break;
+          }
+        case 40:
+          {
+            Input->Right = 0;
+            break;
+          }
+        case 65:
+          {
+            Input->Shoot = 0;
+            break;
+          }
+      }
+    }
   }
+}
+
+void Linux_CopyFile(const char * Source, const char * Destination)
+{
+
+  u32 SrcFD = open(Source, O_RDONLY);
+  Assert(SrcFD != -1);
+
+  u32 DestFD = open(Destination, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  Assert(DestFD != -1);
+
+  struct stat FileStat;
+  u32 Result = fstat(SrcFD, &FileStat);
+  Assert(Result != -1);
+
+  off_t Offset = 0;
+  ssize_t BytesSent;
+  while((BytesSent = sendfile(DestFD, SrcFD, &Offset, FileStat.st_size)) > 0)
+  {
+
+  }
+
+  close(SrcFD);
+  close(DestFD);
+
+
+}
+void Linux_LoadRenderCode(linux_render_code *RenderCode)
+{
+  Linux_CopyFile(GlobalRenderCodePath, GlobalTempRenderCodePath);
+  void * Library = Linux_LibraryLoad(GlobalTempRenderCodePath);
+  RenderCode->Library = Library;
+
+  void * Proc = Linux_GetProcAddress(Library, "BeginFrame");
+  RenderCode->BeginFrame = (renderer_begin_frame*)Proc;
+
+  Proc = Linux_GetProcAddress(Library, "EndFrame");
+  RenderCode->EndFrame = (renderer_end_frame*)Proc;
+
+  Proc = Linux_GetProcAddress(Library, "CreateRenderer");
+  RenderCode->Create   = (renderer_create*)Proc;
+
+  Proc = Linux_GetProcAddress(Library, "ReleaseRenderer");
+  RenderCode->Release  = (renderer_release*)Proc;
+}
+
+void Linux_LoadGameCode(linux_game_code *GameCode)
+{
+  Linux_CopyFile(GlobalGameCodePath, GlobalTempGameCodePath);
+  void * Library = Linux_LibraryLoad(GlobalTempGameCodePath);
+  GameCode->Library = Library;
+
+  void * Proc = Linux_GetProcAddress(Library, "GameUpdate");
+  GameCode->GameUpdate = (game_update*)Proc;
+
+  Proc = Linux_GetProcAddress(Library, "GameGetSoundSamples");
+  GameCode->GameGetSoundSamples = (game_get_sound_samples*)Proc;
 }
 
 int main()
@@ -191,10 +321,15 @@ int main()
   GlobalDeleteAtom = XInternAtom(display, "WM_DELETE_WINDOW", False);
   XSetWMProtocols(display, window, &GlobalDeleteAtom, 1);
 
+  linux_game_code GameCode = {};
+  Linux_LoadGameCode(&GameCode);
+
+  game_input GameInput = {};
+
+
   while(GlobalRunning)
   {
-    Linux_HandleEvents(display);
-
+    Linux_HandleEvents(display, &GameInput);
   }
 
   XDestroyWindow(display, window);
