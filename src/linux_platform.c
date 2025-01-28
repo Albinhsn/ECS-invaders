@@ -1,35 +1,29 @@
 #include "linux_platform.h"
+#include "pushbuffer.c"
 #include "common.h"
 
 
 static u16 GlobalScreenWidth  = 600;
 static u16 GlobalScreenHeight = 800;
+static u16 GlobalFramerateTargetMS = 16;
 static bool GlobalRunning = true;
-static s64 GlobalPerfCountFrequency = 0;
 
 
 #if RENDERER_SOFTWARE
-static const char * GlobalRenderCodePath      = "./build/linux_renderer_software.so";
+static const char * GlobalRenderCodePath      = "../build/linux_renderer_software.so";
 #elif RENDERER_GL
-static const char * GlobalRenderCodePath      = "./build/linux_renderer_gl.so";
+static const char * GlobalRenderCodePath      = "../build/linux_renderer_gl.so";
 #endif
 
-static const char * GlobalTempRenderCodePath  = "./build/lock_renderer.tmp";
-static const char * GlobalGameCodePath        = "./build/invaders.so";
-static const char * GlobalTempGameCodePath    = "./build/lock_game.tmp";
+static const char * GlobalTempRenderCodePath  = "../build/lock_renderer.tmp";
+static const char * GlobalGameCodePath        = "../build/invaders.so";
+static const char * GlobalTempGameCodePath    = "../build/lock_game.tmp";
 Atom GlobalDeleteAtom;
 
 /*
   ToDo:
   * Platform
     * ALSA  (audio)
-  * Renderer
-    * Allocate memory
-    * CreateRenderer
-    * Render
-    * Begin Frame
-    * End Frame
-    * Release Renderer
 */
 
 
@@ -41,7 +35,6 @@ pthread_t Linux_CreateThread(void * Procedure)
 }
 struct timespec Linux_GetTimeInSeconds()
 {
-  Assert(GlobalPerfCountFrequency != 0); 
   struct timespec Result = {};
   clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &Result);
 
@@ -64,7 +57,7 @@ f32 Linux_GetMillisecondsElapsedF(struct timespec PreviousTimer, struct timespec
 
 void Linux_Sleep(u32 Milliseconds)
 {
-  struct timespec TimeSpec;
+  struct timespec TimeSpec = {};
   TimeSpec.tv_sec = Milliseconds / 1000;
   TimeSpec.tv_nsec = (Milliseconds % 1000) * 1000000;
 
@@ -108,7 +101,6 @@ void* Linux_LibraryLoad(const char* Name)
   if (Library == 0)
   {
     fputs(dlerror(), stderr);
-    return 0;
   }
   return Library;
 }
@@ -139,6 +131,7 @@ bool Linux_ReadFile(arena * Arena, const char * Filename, u8** FileBuffer, u32 *
   int FD = open(Filename, O_RDONLY);
   if(FD == -1)
   {
+    printf("Failed to find '%s'\n", Filename);
     return false;
   }
 
@@ -147,15 +140,22 @@ bool Linux_ReadFile(arena * Arena, const char * Filename, u8** FileBuffer, u32 *
 
   *Size= FileStat.st_size;
 
-  void * Memory = Arena_Allocate(Arena, *Size);
 
-  void* Buf = mmap(Memory, *Size, PROT_READ, MAP_PRIVATE | MAP_FIXED, FD, 0);
-
+  void* Buf = mmap(0, *Size, PROT_READ, MAP_SHARED, FD, 0);
   bool FailedToMap = Buf == MAP_FAILED;
   if(FailedToMap)
   {
-    Arena_Deallocate(Arena, *Size);
+    printf("Failed to map the file!!\n");
+  }else
+  {
+    void * Memory = Arena_Allocate(Arena, *Size + 1);
+    Memcpy((u8*)Memory, (u8*)Buf, *Size);
+    ((u8*)Memory)[*Size] = '\0';
+
+    munmap(Buf, *Size);
+    *FileBuffer = (u8*)Memory;
   }
+
   close(FD);
 
   return !FailedToMap;
@@ -202,8 +202,6 @@ void Linux_HandleEvents(Display * display, game_input * Input)
             break;
           }
       }
-      printf("%d\n", event.xkey.keycode);
-
 
     }
     if(event.type == KeyRelease)
@@ -284,10 +282,19 @@ void Linux_LoadRenderCode(linux_render_code *RenderCode)
   RenderCode->Release  = (renderer_release*)Proc;
 }
 
+void Linux_FreeGameCode(linux_game_code* GameCode)
+{
+  Linux_LibraryFree(GameCode->Library);
+  GameCode->Library    = 0;
+  GameCode->GameUpdate = 0;
+  GameCode->GameGetSoundSamples = 0;
+}
+
 void Linux_LoadGameCode(linux_game_code *GameCode)
 {
   Linux_CopyFile(GlobalGameCodePath, GlobalTempGameCodePath);
   void * Library = Linux_LibraryLoad(GlobalTempGameCodePath);
+  Assert(Library != 0);
   GameCode->Library = Library;
 
   void * Proc = Linux_GetProcAddress(Library, "GameUpdate");
@@ -307,13 +314,13 @@ int main()
 
   u32 Screen = DefaultScreen(display);
 
-  Window RootWindow = RootWindow(display, Screen);
-  Window window = XCreateSimpleWindow(display, RootWindow, 10, 10, GlobalScreenWidth, GlobalScreenHeight, 1, BlackPixel(display, Screen), WhitePixel(display, Screen));
+  Window rootWindow = RootWindow(display, Screen);
+  Window window = XCreateSimpleWindow(display, rootWindow, 10, 10, GlobalScreenWidth, GlobalScreenHeight, 1, BlackPixel(display, Screen), WhitePixel(display, Screen));
 
   XStoreName(display, window, "Invaders");
 
   // ToDO more events?
-  XSelectInput(display, window, ExposureMask | KeyPressMask);
+  XSelectInput(display, window, KeyReleaseMask | KeyPressMask);
 
   // Actually display the window
   XMapWindow(display, window);
@@ -323,13 +330,91 @@ int main()
 
   linux_game_code GameCode = {};
   Linux_LoadGameCode(&GameCode);
+  Linux_FreeGameCode(&GameCode);
+  Linux_LoadGameCode(&GameCode);
+
+  u64 GameCodeLastChanged = 0;
+  Linux_FileHasChanged(&GameCodeLastChanged, "../build/invaders.so");
+
+  linux_render_code RenderCode = {};
+  Linux_LoadRenderCode(&RenderCode);
 
   game_input GameInput = {};
 
+  u64   GameMemorySize = Megabyte(205);
+  void* Memory         = Linux_Allocate(GameMemorySize);
 
+  arena GameArena      = {};
+  Arena_Create(&GameArena, Memory, GameMemorySize);
+  
+  game_memory GameMemory          = {};
+  GameMemory.PermanentSize        = Megabyte(100);
+  GameMemory.PermanentStorage     = Arena_Allocate(&GameArena, GameMemory.PermanentSize);
+  GameMemory.TemporaryStorageSize = Megabyte(100);
+  GameMemory.TemporaryStorage     = Arena_Allocate(&GameArena, GameMemory.TemporaryStorageSize);
+  GameMemory.ReadFile             = Linux_ReadFile;
+
+  game_audio GameAudio = {};
+  linux_display_and_window DisplayAndWindow = {};
+  DisplayAndWindow.display  = display;
+  DisplayAndWindow.window   = window;
+  DisplayAndWindow.Screen   = Screen;
+  platform_renderer * PlatformRenderer = RenderCode.Create(GlobalScreenWidth, GlobalScreenHeight, (void*)&DisplayAndWindow);
+
+  // Create pushbuffer
+  pushbuffer Pushbuffer           = {};
+  u64        PushbufferMemorySize = Megabyte(1);
+  void*      PushbufferMemory     = Arena_Allocate(&GameArena, PushbufferMemorySize);
+  Pushbuffer_Create(&Pushbuffer, PushbufferMemory, PushbufferMemorySize);
+
+
+  f32 DeltaTime = GlobalFramerateTargetMS / 1000.0f;
+  f32 SleepError = 0;
   while(GlobalRunning)
   {
+
+    struct timespec StartOfFrame = Linux_GetTimeInSeconds();
+    RenderCode.BeginFrame(PlatformRenderer, &Pushbuffer);
+
+    if(Linux_FileHasChanged(&GameCodeLastChanged, GlobalGameCodePath))
+    {
+      Linux_FreeGameCode(&GameCode);
+      Linux_LoadGameCode(&GameCode);
+    }
+
     Linux_HandleEvents(display, &GameInput);
+    if(!GlobalRunning){
+      break;
+    }
+
+    GameMemory.DeltaTime    = DeltaTime;
+    GameMemory.ScreenWidth  = GlobalScreenWidth;
+    GameMemory.ScreenHeight = GlobalScreenHeight;
+
+    GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
+    if(GameCode.GameGetSoundSamples)
+    {
+      u32 SampleFramesToWrite = 0; // ToDo implement!
+      // GameCode.GameGetSoundSamples(&GameMemory, &GameAudio, SampleFramesToWrite);
+    }
+    RenderCode.EndFrame(PlatformRenderer, &Pushbuffer);
+
+  
+    struct timespec EndOfFrame = Linux_GetTimeInSeconds();
+    f32 FrameMinusSleep = Linux_GetMillisecondsElapsedF(StartOfFrame, EndOfFrame);
+
+    if(FrameMinusSleep < GlobalFramerateTargetMS - SleepError)
+    {
+      f32 TargetSleepTime = GlobalFramerateTargetMS - SleepError;
+      f32 TimeToSleep = TargetSleepTime - FrameMinusSleep;
+      Linux_Sleep((u32)TimeToSleep);
+      f32 FrameTimeMSF       = Linux_GetMillisecondsElapsedF(StartOfFrame, Linux_GetTimeInSeconds());
+      while(FrameTimeMSF < GlobalFramerateTargetMS)
+      {
+        FrameTimeMSF = Linux_GetMillisecondsElapsedF(StartOfFrame, Linux_GetTimeInSeconds());
+      }
+      SleepError = FrameTimeMSF - GlobalFramerateTargetMS;
+    }
   }
 
   XDestroyWindow(display, window);

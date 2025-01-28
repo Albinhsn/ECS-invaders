@@ -12,9 +12,16 @@
 #include <sys/sendfile.h>
 #include <unistd.h>
 #include <x86intrin.h>
-
+ 
 
 #include "platform.h"
+
+typedef struct linux_display_and_window
+{
+  Display * display;
+  Window window;
+  s32 Screen;
+}linux_display_and_window;
 
 typedef struct linux_game_code
 {
