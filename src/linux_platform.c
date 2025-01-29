@@ -1,11 +1,12 @@
 #include "linux_platform.h"
 #include "pushbuffer.c"
 #include "common.h"
+#include <alsa/asoundlib.h>
 
 
 static u16 GlobalScreenWidth  = 600;
 static u16 GlobalScreenHeight = 800;
-static u16 GlobalFramerateTargetMS = 16;
+static u16 GlobalFramerateTargetMS = 30;
 static bool GlobalRunning = true;
 
 
@@ -20,11 +21,37 @@ static const char * GlobalGameCodePath        = "../build/invaders.so";
 static const char * GlobalTempGameCodePath    = "../build/lock_game.tmp";
 Atom GlobalDeleteAtom;
 
-/*
-  ToDo:
-  * Platform
-    * ALSA  (audio)
-*/
+void Linux_Deallocate(void * Memory, u64 Size)
+{
+  munmap(Memory, Size);
+}
+
+void * Linux_Allocate(u64 Size)
+{
+  void * Result = mmap(0, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  return Result;
+}
+
+pthread_t Linux_CreateThreadCritical(void * Procedure)
+{
+  pthread_t Thread = 0;
+  pthread_attr_t Attributes;
+
+  pthread_attr_init(&Attributes);
+
+  s32 MaxPriority = sched_get_priority_max(SCHED_FIFO);
+
+  struct sched_param Param = {}; 
+  Param.sched_priority = MaxPriority; 
+  
+  pthread_attr_setschedparam(&Attributes, &Param);
+  pthread_attr_setinheritsched(&Attributes, PTHREAD_EXPLICIT_SCHED);
+  
+  pthread_create(&Thread, &Attributes, Procedure, 0);
+
+  pthread_attr_destroy(&Attributes);
+  return Thread;
+}
 
 
 pthread_t Linux_CreateThread(void * Procedure)
@@ -71,6 +98,26 @@ void Linux_KillThread(pthread_t Thread)
   pthread_join(Thread, 0);
 }
 
+typedef struct linux_audio
+{
+  snd_pcm_t * Handle;
+  game_audio GameAudio;
+  snd_pcm_uframes_t BufferFrameCount;
+  u32 Channels;
+  bool CanStart;
+
+}linux_audio;
+
+linux_audio GlobalAudio;
+
+
+void Linux_DeinitALSA()
+{
+  snd_pcm_drain(GlobalAudio.Handle);
+  snd_pcm_close(GlobalAudio.Handle);
+}
+
+
 
 bool Linux_FileHasChanged(u64 * FileLastChangedTimer, const char * Filename)
 {
@@ -112,17 +159,6 @@ void Linux_LibraryFree(void* Handle)
 void * Linux_GetProcAddress(void * Library, const char * Name)
 {
   return dlsym(Library, Name);
-}
-
-void Linux_Deallocate(void * Memory, u64 Size)
-{
-  munmap(Memory, Size);
-}
-
-void * Linux_Allocate(u64 Size)
-{
-  void * Result = mmap(0, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  return Result;
 }
 
 
@@ -304,6 +340,197 @@ void Linux_LoadGameCode(linux_game_code *GameCode)
   GameCode->GameGetSoundSamples = (game_get_sound_samples*)Proc;
 }
 
+void Linux_InitALSA(arena * Arena)
+{
+  s32 Error;
+  snd_pcm_hw_params_t* HWParams;
+
+  Error = snd_pcm_open(&GlobalAudio.Handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
+
+  if(Error < 0)
+  {
+    Assert(0 && "Failed to open audio device!");
+  }
+
+  Error = snd_pcm_hw_params_malloc(&HWParams);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed allocate hw params!");
+  }
+
+  Error = snd_pcm_hw_params_any(GlobalAudio.Handle, HWParams);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed allocate hw params!");
+  }
+
+  Error = snd_pcm_hw_params_set_access(GlobalAudio.Handle, HWParams, SND_PCM_ACCESS_RW_INTERLEAVED);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed allocate hw params!");
+  }
+
+  Error = snd_pcm_hw_params_set_format(GlobalAudio.Handle, HWParams, SND_PCM_FORMAT_FLOAT_LE);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed allocate hw params!");
+  }
+
+
+  u32 SamplingRate = 44100;
+  Error = snd_pcm_hw_params_set_rate_near(GlobalAudio.Handle, HWParams, &SamplingRate, 0);
+  if(Error < 0 || SamplingRate != 44100)
+  {
+    Assert(0 && "Failed allocate hw params!");
+  }
+
+  GlobalAudio.Channels = 2;
+  Error = snd_pcm_hw_params_set_channels(GlobalAudio.Handle, HWParams, GlobalAudio.Channels);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed set channels!");
+  }
+
+
+  u32 BufferTime = GlobalFramerateTargetMS * 2 * 1000;
+  Error = snd_pcm_hw_params_set_buffer_time_near(GlobalAudio.Handle, HWParams, &BufferTime, 0);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed set buffer tike!");
+  }
+
+  GlobalAudio.BufferFrameCount = (u32)(SamplingRate * (float)(GlobalFramerateTargetMS  * 2.0f / 1000.0f));
+  snd_pcm_uframes_t BufferSize = 0;
+  Error = snd_pcm_hw_params_get_buffer_size(HWParams, &BufferSize);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed set buffer size!");
+  }
+  printf("Got a buffer of %ld\n", BufferSize);
+
+  snd_pcm_uframes_t PeriodSize = BufferSize / 2;
+  Error = snd_pcm_hw_params_set_period_size_near(GlobalAudio.Handle, HWParams, &PeriodSize, 0);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed set period size!");
+  }
+  printf("Got Period size %ld\n", PeriodSize);
+
+  game_audio  *GameAudio = &GlobalAudio.GameAudio;
+  u32 NumberOfBuffers                      = 2;
+  u32 SampleFramesToWrite                  = GlobalAudio.BufferFrameCount;
+  GameAudio->SampleFrameCount              = SampleFramesToWrite * NumberOfBuffers;
+  GameAudio->SampleFrameIndexAudioThread   = 0;
+  GameAudio->SampleFrameIndexGameCode      = 0;
+  GameAudio->Buffer = (f32*)Arena_Allocate(Arena, sizeof(f32) * GameAudio->SampleFrameCount * GameAudio->Channels);
+
+  // This applies the parameters we wanted
+  Error = snd_pcm_hw_params(GlobalAudio.Handle, HWParams);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed set channels!");
+  }
+  snd_pcm_hw_params_free(HWParams);
+
+  Error = snd_pcm_wait(GlobalAudio.Handle, 100);
+  s32 FramesToWrite = snd_pcm_avail_update(GlobalAudio.Handle);
+  f32 * Frames = GameAudio->Buffer;
+  for(s32 FrameToWriteIndex = 0; FrameToWriteIndex < FramesToWrite; FrameToWriteIndex++)
+  {
+    *Frames++ = 0;
+    *Frames++ = 0;
+  }
+
+  Error = snd_pcm_writei(GlobalAudio.Handle, GameAudio->Buffer, FramesToWrite);
+  if(Error < 0){
+    printf("Error writing the first frames!\n");
+    return;
+  }
+  printf("Wrote initial %ld frames\n", FramesToWrite);
+
+
+  FramesToWrite = 0;
+  while(FramesToWrite == 0)
+  {
+    s32 Error = snd_pcm_wait(GlobalAudio.Handle, 100);
+    FramesToWrite = snd_pcm_avail_update(GlobalAudio.Handle);
+    printf("Waiting for new frames\n");
+  }
+
+}
+
+void Linux_RunAudioThread()
+{
+
+  // Allocate two buffers worth!
+  u64 BufferSize  = sizeof(f32) * GlobalAudio.Channels * GlobalAudio.BufferFrameCount;
+  printf("Allocated buffer of size %ld\n", BufferSize);
+  f32 * Buffer    = (f32*)Linux_Allocate(BufferSize);
+
+  game_audio * GameAudio = &GlobalAudio.GameAudio;
+
+  while(!GlobalAudio.CanStart)
+  {
+  }
+
+
+  while(true)
+  {
+    snd_pcm_sframes_t FramesToWrite;
+    s32 Error;
+
+    Error = snd_pcm_wait(GlobalAudio.Handle, 100);
+    if(Error < 0)
+    {
+      printf("Poll failed: '%s'\n", snd_strerror(Error));
+      break;
+    }
+
+    FramesToWrite = snd_pcm_avail_update(GlobalAudio.Handle);
+
+    if(FramesToWrite < 0)
+    {
+      if(FramesToWrite == -EPIPE)
+      {
+        printf("An xrun occured!!\n");
+      }else
+      {
+        printf("Unknown error?!!\n");
+      }
+      break;
+    }
+
+    u32 Period = GlobalAudio.BufferFrameCount / 2;
+    if(FramesToWrite < Period)
+    {
+      printf("Wanted to write %ld\n", FramesToWrite);
+      continue;
+    }
+    FramesToWrite = Period;
+
+
+    // Write the frames into the buffer
+    f32 * Frames = Buffer;
+    for(s32 FrameToWriteIndex = 0; FrameToWriteIndex < FramesToWrite; FrameToWriteIndex++)
+    {
+      *Frames++ = GameAudio->Buffer[GameAudio->SampleFrameIndexAudioThread * 2 + 0];
+      *Frames++ = GameAudio->Buffer[GameAudio->SampleFrameIndexAudioThread * 2 + 1];
+      GameAudio->SampleFrameIndexAudioThread++;
+      GameAudio->SampleFrameIndexAudioThread %= GameAudio->SampleFrameCount;
+    }
+
+    Error = snd_pcm_writei(GlobalAudio.Handle, Buffer, FramesToWrite);
+    if(Error < 0){
+      printf("Error writing the frames!\n");
+      break;
+    }
+    printf("AUDIO: %ld, %d\n", FramesToWrite, GameAudio->SampleFrameIndexAudioThread);
+  }
+
+  Linux_Deallocate((void*)Buffer, BufferSize);
+
+}
+
 int main()
 {
   Display * display = XOpenDisplay(0);
@@ -352,7 +579,7 @@ int main()
   GameMemory.TemporaryStorage     = Arena_Allocate(&GameArena, GameMemory.TemporaryStorageSize);
   GameMemory.ReadFile             = Linux_ReadFile;
 
-  game_audio GameAudio = {};
+
   linux_display_and_window DisplayAndWindow = {};
   DisplayAndWindow.display  = display;
   DisplayAndWindow.window   = window;
@@ -365,6 +592,9 @@ int main()
   void*      PushbufferMemory     = Arena_Allocate(&GameArena, PushbufferMemorySize);
   Pushbuffer_Create(&Pushbuffer, PushbufferMemory, PushbufferMemorySize);
 
+  // Init audio thread
+  Linux_InitALSA(&GameArena);
+  pthread_t AudioThread = Linux_CreateThreadCritical((void*)Linux_RunAudioThread);
 
   f32 DeltaTime = GlobalFramerateTargetMS / 1000.0f;
   f32 SleepError = 0;
@@ -392,8 +622,8 @@ int main()
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
     if(GameCode.GameGetSoundSamples)
     {
-      u32 SampleFramesToWrite = 0; // ToDo implement!
-      // GameCode.GameGetSoundSamples(&GameMemory, &GameAudio, SampleFramesToWrite);
+      u32 SampleFramesToWrite = GlobalAudio.BufferFrameCount; // ToDo implement!
+      GameCode.GameGetSoundSamples(&GameMemory, &GlobalAudio.GameAudio, SampleFramesToWrite);
     }
     RenderCode.EndFrame(PlatformRenderer, &Pushbuffer);
 
@@ -413,10 +643,15 @@ int main()
       }
       SleepError = FrameTimeMSF - GlobalFramerateTargetMS;
     }
+
+    // Figure out better way for this!
+    GlobalAudio.CanStart = true;
   }
 
   XDestroyWindow(display, window);
   XCloseDisplay(display);
+  Linux_KillThread(AudioThread);
+  Linux_DeinitALSA();
 
   return 0;
 

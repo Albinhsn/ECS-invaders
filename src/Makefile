@@ -1,6 +1,6 @@
 CC := gcc
 CFLAGS := -O0 -g 
-LDFLAGS := -lm -lX11
+LDFLAGS := -lm -lX11 -lasound
 VARIABLES := -DPLATFORM_LINUX=1 -DRENDERER_SOFTWARE=1
 
 platform:
