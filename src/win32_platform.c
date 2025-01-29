@@ -677,7 +677,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     f32           FrameMinusSleep = Win32_GetMillisecondsElapsedF(PreviousTimer, CurrentTimer, GlobalPerfCountFrequency);;
 
-    if (FrameMinusSleep < GlobalFramerateTargetMS)
+    if (FrameMinusSleep < GlobalFramerateTargetMS - SleepError)
     {
       f32 TargetSleepTime = GlobalFramerateTargetMS - SleepError;
       f32 TimeToSleep = TargetSleepTime - FrameMinusSleep;

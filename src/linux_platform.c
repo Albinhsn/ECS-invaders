@@ -2,6 +2,7 @@
 #include "pushbuffer.c"
 #include "common.h"
 #include <alsa/asoundlib.h>
+#include <limits.h>
 
 
 static u16 GlobalScreenWidth  = 600;
@@ -103,8 +104,10 @@ typedef struct linux_audio
   snd_pcm_t * Handle;
   game_audio GameAudio;
   snd_pcm_uframes_t BufferFrameCount;
+  snd_pcm_uframes_t PeriodSize;
   u32 Channels;
   bool CanStart;
+  
 
 }linux_audio;
 
@@ -408,13 +411,15 @@ void Linux_InitALSA(arena * Arena)
   }
   printf("Got a buffer of %ld\n", BufferSize);
 
-  snd_pcm_uframes_t PeriodSize = BufferSize / 2;
+  snd_pcm_uframes_t PeriodSize = BufferSize / 4;
   Error = snd_pcm_hw_params_set_period_size_near(GlobalAudio.Handle, HWParams, &PeriodSize, 0);
   if(Error < 0)
   {
     Assert(0 && "Failed set period size!");
   }
   printf("Got Period size %ld\n", PeriodSize);
+
+  GlobalAudio.PeriodSize = PeriodSize;
 
   game_audio  *GameAudio = &GlobalAudio.GameAudio;
   u32 NumberOfBuffers                      = 2;
@@ -432,30 +437,27 @@ void Linux_InitALSA(arena * Arena)
   }
   snd_pcm_hw_params_free(HWParams);
 
-  Error = snd_pcm_wait(GlobalAudio.Handle, 100);
-  s32 FramesToWrite = snd_pcm_avail_update(GlobalAudio.Handle);
-  f32 * Frames = GameAudio->Buffer;
-  for(s32 FrameToWriteIndex = 0; FrameToWriteIndex < FramesToWrite; FrameToWriteIndex++)
+  snd_pcm_sw_params_t* SWParams;
+
+  snd_pcm_sw_params_malloc(&SWParams);
+  if(Error < 0)
   {
-    *Frames++ = 0;
-    *Frames++ = 0;
+    Assert(0 && "Failed set channels!");
   }
+  snd_pcm_sw_params_current(GlobalAudio.Handle, SWParams);
 
-  Error = snd_pcm_writei(GlobalAudio.Handle, GameAudio->Buffer, FramesToWrite);
-  if(Error < 0){
-    printf("Error writing the first frames!\n");
-    return;
-  }
-  printf("Wrote initial %ld frames\n", FramesToWrite);
-
-
-  FramesToWrite = 0;
-  while(FramesToWrite == 0)
+  snd_pcm_sw_params_set_start_threshold(GlobalAudio.Handle, SWParams, INT_MAX);
+  if(Error < 0)
   {
-    s32 Error = snd_pcm_wait(GlobalAudio.Handle, 100);
-    FramesToWrite = snd_pcm_avail_update(GlobalAudio.Handle);
-    printf("Waiting for new frames\n");
+    Assert(0 && "Failed set channels!");
   }
+
+  Error = snd_pcm_sw_params(GlobalAudio.Handle, SWParams);
+  if(Error < 0)
+  {
+    Assert(0 && "Failed set channels!");
+  }
+  snd_pcm_sw_params_free(SWParams);
 
 }
 
@@ -469,11 +471,14 @@ void Linux_RunAudioThread()
 
   game_audio * GameAudio = &GlobalAudio.GameAudio;
 
+  snd_pcm_uframes_t PeriodSize = GlobalAudio.PeriodSize;
   while(!GlobalAudio.CanStart)
   {
   }
 
 
+
+  snd_pcm_start(GlobalAudio.Handle);
   while(true)
   {
     snd_pcm_sframes_t FramesToWrite;
@@ -500,13 +505,12 @@ void Linux_RunAudioThread()
       break;
     }
 
-    u32 Period = GlobalAudio.BufferFrameCount / 2;
-    if(FramesToWrite < Period)
+    if(FramesToWrite < PeriodSize)
     {
       printf("Wanted to write %ld\n", FramesToWrite);
       continue;
     }
-    FramesToWrite = Period;
+    FramesToWrite = PeriodSize;
 
 
     // Write the frames into the buffer
@@ -631,17 +635,19 @@ int main()
     struct timespec EndOfFrame = Linux_GetTimeInSeconds();
     f32 FrameMinusSleep = Linux_GetMillisecondsElapsedF(StartOfFrame, EndOfFrame);
 
-    if(FrameMinusSleep < GlobalFramerateTargetMS - SleepError)
+    f32 TargetSleepTime =GlobalFramerateTargetMS - SleepError;
+    if(FrameMinusSleep < TargetSleepTime)
     {
-      f32 TargetSleepTime = GlobalFramerateTargetMS - SleepError;
       f32 TimeToSleep = TargetSleepTime - FrameMinusSleep;
       Linux_Sleep((u32)TimeToSleep);
       f32 FrameTimeMSF       = Linux_GetMillisecondsElapsedF(StartOfFrame, Linux_GetTimeInSeconds());
-      while(FrameTimeMSF < GlobalFramerateTargetMS)
+      printf("Time after first sleep %.2lf\n", FrameTimeMSF);
+      while(FrameTimeMSF < TargetSleepTime)
       {
         FrameTimeMSF = Linux_GetMillisecondsElapsedF(StartOfFrame, Linux_GetTimeInSeconds());
       }
-      SleepError = FrameTimeMSF - GlobalFramerateTargetMS;
+      SleepError = FrameTimeMSF - TargetSleepTime;
+      printf("Frame took %.2lf, Error %.2lf, Target: %.2lf, Frame: %.2lf, Slept for %.2lf\n", FrameTimeMSF, SleepError, TargetSleepTime, FrameMinusSleep, TimeToSleep);
     }
 
     // Figure out better way for this!
