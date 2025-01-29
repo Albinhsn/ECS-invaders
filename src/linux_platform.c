@@ -97,7 +97,7 @@ bool Linux_FileHasChanged(u64 * FileLastChangedTimer, const char * Filename)
 
 void* Linux_LibraryLoad(const char* Name)
 {
-  void* Library = dlopen(Name, RTLD_NOW | RTLD_GLOBAL);
+  void* Library = dlopen(Name, RTLD_NOW);
   if (Library == 0)
   {
     fputs(dlerror(), stderr);
@@ -330,11 +330,9 @@ int main()
 
   linux_game_code GameCode = {};
   Linux_LoadGameCode(&GameCode);
-  Linux_FreeGameCode(&GameCode);
-  Linux_LoadGameCode(&GameCode);
 
   u64 GameCodeLastChanged = 0;
-  Linux_FileHasChanged(&GameCodeLastChanged, "../build/invaders.so");
+  Linux_FileHasChanged(&GameCodeLastChanged, GlobalGameCodePath);
 
   linux_render_code RenderCode = {};
   Linux_LoadRenderCode(&RenderCode);
