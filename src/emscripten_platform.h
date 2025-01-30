@@ -1,0 +1,5 @@
+#ifndef EMSCRIPTEN_PLATFORM
+#define EMSCRIPTEN_PLATFORM
+
+
+#endif
