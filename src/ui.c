@@ -88,7 +88,7 @@ u64 UI_KeyFromString(string String)
   return Key;
 }
 
-ui_box * UI_BoxFromKey()
+ui_box * UI_BoxFromKey(u64 Key)
 {
   return 0;
 }

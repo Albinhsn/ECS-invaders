@@ -52,7 +52,7 @@ typedef struct game_state
   game_state_type State;
   arena          PermanentArena;
   arena          TemporaryArena;
-  highscore      Highscores[MAX_HIGHSCORES];
+  highscore      *Highscores;
   u32            HighscoreCount;
   entity_manager EntityManager;
   entity         PlayerEntity;

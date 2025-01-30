@@ -693,9 +693,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
       }
       f32 Error = SleepError;
       SleepError = FrameTimeMSF - TargetSleepTime;
-      char          FrameTimeBuf[1024] = {};
-      sprintf_s(FrameTimeBuf, ArrayCount(FrameTimeBuf), "Slept for: %.4f, prev error %f, Frame: %f, Sleep: %f, target: %f\n", FrameTimeMSF, Error, FrameMinusSleep, TimeToSleep, TargetSleepTime);
-      OutputDebugStringA(FrameTimeBuf);
     }
     else
     {
@@ -706,9 +703,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     CurrentTimer  = Win32_GetTimeInSeconds();
     PreviousTimer = CurrentTimer;
-    char          FrameTimeBuf[1024] = {};
-    sprintf_s(FrameTimeBuf, ArrayCount(FrameTimeBuf), "Frame: %.4f\n", FrameMinusSleep);
-    OutputDebugStringA(FrameTimeBuf);
 
     GlobalAudio.CanStartThread = true;
 
