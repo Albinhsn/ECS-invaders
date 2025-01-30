@@ -7,6 +7,10 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <stdarg.h>
+#elif PLATFORM_WEB
+#include <arpa/inet.h>
+#include <string.h>
+#include <stdarg.h>
 #endif
 
 #include <stdint.h>
@@ -29,7 +33,7 @@ typedef double   f64;
 #define true              1
 #define false             0
 
-#define bool              u32
+// #define bool              u32
 #define PI                3.141592653589793f
 
 #define Kilobyte(size)    (size * 1024LL)
@@ -39,11 +43,17 @@ typedef double   f64;
 
 #define sprintf_s(buffer, ...) snprintf((buffer), __VA_ARGS__)
 
+#if PLATFORM_WINDOW | PLATFORM_LINUX
 #define Assert(Expr)                                                                                                                                                                                   \
   {                                                                                                                                                                                                    \
     if (!(Expr)){                                                                                                                                                                                       \
       int a = *(int*)0;}                                                                                                                                                                                \
   }
+#else
+#include <assert.h>
+#define Assert(Expr) assert(Expr)
+#endif
+
 #define DeferLoop(begin, end) for(int _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 typedef struct arena
 {

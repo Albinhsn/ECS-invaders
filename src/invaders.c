@@ -92,7 +92,7 @@ void LoadTextures(game_state* GameState, game_memory* Memory)
     bool        Result          = Memory->ReadFile(&GameState->PermanentArena, (const char*)&Buffer.Buffer[StartOfTextureLocation], &TextureBuffer.Buffer, &TextureBuffer.Length);
     if (Result == false)
     {
-      Assert(0 && "Failed to read texture!")
+      Assert(0 && "Failed to read texture!");
     }
 
     image Image = {};
@@ -201,7 +201,7 @@ void LoadSounds(game_state* GameState, game_memory* Memory)
     bool        Result          = Memory->ReadFile(&GameState->PermanentArena, (const char*)&Buffer.Buffer[StartOfSoundLocation], &SoundBuffer.Buffer, &SoundBuffer.Length);
     if (Result == false)
     {
-      Assert(0 && "Failed to read sound!")
+      Assert(0 && "Failed to read sound!");
     }
 
     Result = Sound_ParseWave(&GameState->PermanentArena, &GameState->Sounds[SoundIndex], SoundBuffer.Buffer, SoundBuffer.Length);

@@ -62,6 +62,7 @@ pthread_t Linux_CreateThread(void * Procedure)
   pthread_create(&Thread, 0, Procedure, 0);
   return Thread;
 }
+
 struct timespec Linux_GetTimeInSeconds()
 {
   struct timespec Result = {};

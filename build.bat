@@ -1,4 +1,4 @@
-@echo off
+REM @echo off
 setlocal
 
 set TARGET_PLATFORM=WEB
@@ -24,7 +24,8 @@ if "%TARGET_PLATFORM%"=="WINDOWS" (
 	cl %CommonCompilerFlags% ..\src\win32_platform.c  /link %CommonLinkerFlags%
 	if %errorlevel% neq 0 exit /b 1
 ) else (
-	emcc ..\src\invaders.c -O3 -o .\invaders.wasm -sSIDE_MODULE=2
-	REM emcc ..\src\emscripten_platform.c -sMAIN_MODULE=1 -O3 -s USE_SDL=2 -s FULL_ES3=1 -s WASM=1 -s GL_SUPPORT_AUTOMATIC_ENABLE_EXTENSIONS=1 -s GL_SUPPORT_SIMPLE_ENABLE_EXTENSIONS=1 -o .\hello.html
+	set CommonCompilerFlags=-Wno-null-dereference 
+	REM emcc ..\src\invaders.c -O3 -o .\invaders.wasm -sSIDE_MODULE=2 %CommonCompilerFlags% 
+	emcc ..\src\emscripten_platform.c -sMAIN_MODULE=1 -O3 -pthread -s USE_WEBGL2=1 -s FULL_ES2=1 -s WASM=1 -o .\invaders.html -DPLATFORM_WEB=1 --shell-file ..\src\shell.html
 )
 popd
