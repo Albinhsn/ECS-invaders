@@ -1,7 +1,7 @@
 #include "linux_platform.h"
 #include "pushbuffer.c"
 #include "common.h"
-#include <alsa/asoundlib.h>
+#include <pthread.h>
 #include <limits.h>
 
 
@@ -20,6 +20,7 @@ static const char * GlobalRenderCodePath      = "../build/linux_renderer_gl.so";
 static const char * GlobalTempRenderCodePath  = "../build/lock_renderer.tmp";
 static const char * GlobalGameCodePath        = "../build/invaders.so";
 static const char * GlobalTempGameCodePath    = "../build/lock_game.tmp";
+static linux_audio* GlobalAudio;
 Atom GlobalDeleteAtom;
 
 void Linux_Deallocate(void * Memory, u64 Size)
@@ -64,7 +65,7 @@ pthread_t Linux_CreateThread(void * Procedure)
 struct timespec Linux_GetTimeInSeconds()
 {
   struct timespec Result = {};
-  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &Result);
+  clock_gettime(CLOCK_REALTIME, &Result);
 
   return Result;
 }
@@ -72,10 +73,10 @@ struct timespec Linux_GetTimeInSeconds()
 f32 Linux_GetMillisecondsElapsedF(struct timespec PreviousTimer, struct timespec CurrentTimer)
 {
   
-  struct timespec Diff;
-  if ((CurrentTimer.tv_nsec - PreviousTimer.tv_nsec)<0) {
+  struct timespec Diff = {};
+  if (CurrentTimer.tv_nsec < PreviousTimer.tv_nsec) {
       Diff.tv_sec  = CurrentTimer.tv_sec - PreviousTimer.tv_sec-1;
-      Diff.tv_nsec = 1000000000+CurrentTimer.tv_nsec - PreviousTimer.tv_nsec;
+      Diff.tv_nsec = 1000000000 +CurrentTimer.tv_nsec - PreviousTimer.tv_nsec;
   } else {
       Diff.tv_sec  = CurrentTimer.tv_sec - PreviousTimer.tv_sec;
       Diff.tv_nsec = CurrentTimer.tv_nsec - PreviousTimer.tv_nsec;
@@ -83,13 +84,15 @@ f32 Linux_GetMillisecondsElapsedF(struct timespec PreviousTimer, struct timespec
     return (float)Diff.tv_sec * 1000.0f + (float)Diff.tv_nsec / 1000000.0f;
 }
 
-void Linux_Sleep(u32 Milliseconds)
+void Linux_Sleep(f32 Milliseconds)
 {
   struct timespec TimeSpec = {};
-  TimeSpec.tv_sec = Milliseconds / 1000;
-  TimeSpec.tv_nsec = (Milliseconds % 1000) * 1000000;
+  TimeSpec.tv_sec = 0;
+  TimeSpec.tv_nsec = (u32)(Milliseconds * 1000000);
 
-  nanosleep(&TimeSpec, 0);
+  struct timespec Remaining = {};
+
+  nanosleep(&TimeSpec, &Remaining);
 }
 
 void Linux_KillThread(pthread_t Thread)
@@ -99,25 +102,13 @@ void Linux_KillThread(pthread_t Thread)
   pthread_join(Thread, 0);
 }
 
-typedef struct linux_audio
-{
-  snd_pcm_t * Handle;
-  game_audio GameAudio;
-  snd_pcm_uframes_t BufferFrameCount;
-  snd_pcm_uframes_t PeriodSize;
-  u32 Channels;
-  bool CanStart;
-  
 
-}linux_audio;
-
-linux_audio GlobalAudio;
 
 
 void Linux_DeinitALSA()
 {
-  snd_pcm_drain(GlobalAudio.Handle);
-  snd_pcm_close(GlobalAudio.Handle);
+  snd_pcm_drain(GlobalAudio->Handle);
+  snd_pcm_close(GlobalAudio->Handle);
 }
 
 
@@ -348,7 +339,7 @@ void Linux_InitALSA(arena * Arena)
   s32 Error;
   snd_pcm_hw_params_t* HWParams;
 
-  Error = snd_pcm_open(&GlobalAudio.Handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
+  Error = snd_pcm_open(&GlobalAudio->Handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
 
   if(Error < 0)
   {
@@ -361,19 +352,19 @@ void Linux_InitALSA(arena * Arena)
     Assert(0 && "Failed allocate hw params!");
   }
 
-  Error = snd_pcm_hw_params_any(GlobalAudio.Handle, HWParams);
+  Error = snd_pcm_hw_params_any(GlobalAudio->Handle, HWParams);
   if(Error < 0)
   {
     Assert(0 && "Failed allocate hw params!");
   }
 
-  Error = snd_pcm_hw_params_set_access(GlobalAudio.Handle, HWParams, SND_PCM_ACCESS_RW_INTERLEAVED);
+  Error = snd_pcm_hw_params_set_access(GlobalAudio->Handle, HWParams, SND_PCM_ACCESS_RW_INTERLEAVED);
   if(Error < 0)
   {
     Assert(0 && "Failed allocate hw params!");
   }
 
-  Error = snd_pcm_hw_params_set_format(GlobalAudio.Handle, HWParams, SND_PCM_FORMAT_FLOAT_LE);
+  Error = snd_pcm_hw_params_set_format(GlobalAudio->Handle, HWParams, SND_PCM_FORMAT_FLOAT_LE);
   if(Error < 0)
   {
     Assert(0 && "Failed allocate hw params!");
@@ -381,56 +372,52 @@ void Linux_InitALSA(arena * Arena)
 
 
   u32 SamplingRate = 44100;
-  Error = snd_pcm_hw_params_set_rate_near(GlobalAudio.Handle, HWParams, &SamplingRate, 0);
+  Error = snd_pcm_hw_params_set_rate_near(GlobalAudio->Handle, HWParams, &SamplingRate, 0);
   if(Error < 0 || SamplingRate != 44100)
   {
     Assert(0 && "Failed allocate hw params!");
   }
 
-  GlobalAudio.Channels = 2;
-  Error = snd_pcm_hw_params_set_channels(GlobalAudio.Handle, HWParams, GlobalAudio.Channels);
+  GlobalAudio->Channels = 2;
+  Error = snd_pcm_hw_params_set_channels(GlobalAudio->Handle, HWParams, GlobalAudio->Channels);
   if(Error < 0)
   {
     Assert(0 && "Failed set channels!");
   }
 
 
-  u32 BufferTime = GlobalFramerateTargetMS * 2 * 1000;
-  Error = snd_pcm_hw_params_set_buffer_time_near(GlobalAudio.Handle, HWParams, &BufferTime, 0);
+  u32 BufferTime = GlobalFramerateTargetMS * 1000;
+  Error = snd_pcm_hw_params_set_buffer_time_near(GlobalAudio->Handle, HWParams, &BufferTime, 0);
   if(Error < 0)
   {
     Assert(0 && "Failed set buffer tike!");
   }
 
-  GlobalAudio.BufferFrameCount = (u32)(SamplingRate * (float)(GlobalFramerateTargetMS  * 2.0f / 1000.0f));
+  GlobalAudio->BufferFrameCount = (u32)(SamplingRate * (float)(GlobalFramerateTargetMS  * 1.0f / 1000.0f));
   snd_pcm_uframes_t BufferSize = 0;
   Error = snd_pcm_hw_params_get_buffer_size(HWParams, &BufferSize);
   if(Error < 0)
   {
     Assert(0 && "Failed set buffer size!");
   }
-  printf("Got a buffer of %ld\n", BufferSize);
 
-  snd_pcm_uframes_t PeriodSize = BufferSize / 4;
-  Error = snd_pcm_hw_params_set_period_size_near(GlobalAudio.Handle, HWParams, &PeriodSize, 0);
+  u32 PeriodTime = BufferTime / 3; 
+  Error = snd_pcm_hw_params_set_period_time_near(GlobalAudio->Handle, HWParams, &PeriodTime, 0);
   if(Error < 0)
   {
-    Assert(0 && "Failed set period size!");
+    Assert(0 && "Failed set period time!");
   }
-  printf("Got Period size %ld\n", PeriodSize);
 
-  GlobalAudio.PeriodSize = PeriodSize;
-
-  game_audio  *GameAudio = &GlobalAudio.GameAudio;
+  game_audio  *GameAudio                   = &GlobalAudio->GameAudio;
   u32 NumberOfBuffers                      = 2;
-  u32 SampleFramesToWrite                  = GlobalAudio.BufferFrameCount;
+  u32 SampleFramesToWrite                  = GlobalAudio->BufferFrameCount;
   GameAudio->SampleFrameCount              = SampleFramesToWrite * NumberOfBuffers;
   GameAudio->SampleFrameIndexAudioThread   = 0;
   GameAudio->SampleFrameIndexGameCode      = 0;
   GameAudio->Buffer = (f32*)Arena_Allocate(Arena, sizeof(f32) * GameAudio->SampleFrameCount * GameAudio->Channels);
 
   // This applies the parameters we wanted
-  Error = snd_pcm_hw_params(GlobalAudio.Handle, HWParams);
+  Error = snd_pcm_hw_params(GlobalAudio->Handle, HWParams);
   if(Error < 0)
   {
     Assert(0 && "Failed set channels!");
@@ -444,54 +431,57 @@ void Linux_InitALSA(arena * Arena)
   {
     Assert(0 && "Failed set channels!");
   }
-  snd_pcm_sw_params_current(GlobalAudio.Handle, SWParams);
+  snd_pcm_sw_params_current(GlobalAudio->Handle, SWParams);
 
-  snd_pcm_sw_params_set_start_threshold(GlobalAudio.Handle, SWParams, INT_MAX);
-  if(Error < 0)
-  {
-    Assert(0 && "Failed set channels!");
-  }
-
-  Error = snd_pcm_sw_params(GlobalAudio.Handle, SWParams);
+  Error = snd_pcm_sw_params(GlobalAudio->Handle, SWParams);
   if(Error < 0)
   {
     Assert(0 && "Failed set channels!");
   }
   snd_pcm_sw_params_free(SWParams);
 
+  snd_pcm_prepare(GlobalAudio->Handle);
+
+  snd_pcm_state_t State;
+  State = snd_pcm_state(GlobalAudio->Handle);
+
+  GlobalAudio->Mutex      = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+  GlobalAudio->Condition  = (pthread_cond_t)PTHREAD_COND_INITIALIZER;
 }
 
 void Linux_RunAudioThread()
 {
 
   // Allocate two buffers worth!
-  u64 BufferSize  = sizeof(f32) * GlobalAudio.Channels * GlobalAudio.BufferFrameCount;
-  printf("Allocated buffer of size %ld\n", BufferSize);
+  u64 BufferSize  = sizeof(f32) * GlobalAudio->Channels * GlobalAudio->BufferFrameCount;
   f32 * Buffer    = (f32*)Linux_Allocate(BufferSize);
 
-  game_audio * GameAudio = &GlobalAudio.GameAudio;
+  game_audio * GameAudio = &GlobalAudio->GameAudio;
 
-  snd_pcm_uframes_t PeriodSize = GlobalAudio.PeriodSize;
-  while(!GlobalAudio.CanStart)
+  pthread_mutex_lock(&GlobalAudio->Mutex);
+  while(!GlobalAudio->CanStart)
   {
+    pthread_cond_wait(&GlobalAudio->Condition, &GlobalAudio->Mutex);
   }
+  pthread_mutex_unlock(&GlobalAudio->Mutex);
 
 
-
-  snd_pcm_start(GlobalAudio.Handle);
+  snd_pcm_start(GlobalAudio->Handle);
+  // This call somehow avoids the stall?
+  snd_pcm_state_t State = snd_pcm_state(GlobalAudio->Handle);
+  struct timespec Current = Linux_GetTimeInSeconds();
   while(true)
   {
     snd_pcm_sframes_t FramesToWrite;
     s32 Error;
-
-    Error = snd_pcm_wait(GlobalAudio.Handle, 100);
+    Error = snd_pcm_wait(GlobalAudio->Handle, 100);
     if(Error < 0)
     {
       printf("Poll failed: '%s'\n", snd_strerror(Error));
       break;
     }
 
-    FramesToWrite = snd_pcm_avail_update(GlobalAudio.Handle);
+    FramesToWrite = snd_pcm_avail_update(GlobalAudio->Handle);
 
     if(FramesToWrite < 0)
     {
@@ -505,13 +495,6 @@ void Linux_RunAudioThread()
       break;
     }
 
-    if(FramesToWrite < PeriodSize)
-    {
-      printf("Wanted to write %ld\n", FramesToWrite);
-      continue;
-    }
-    FramesToWrite = PeriodSize;
-
 
     // Write the frames into the buffer
     f32 * Frames = Buffer;
@@ -523,12 +506,12 @@ void Linux_RunAudioThread()
       GameAudio->SampleFrameIndexAudioThread %= GameAudio->SampleFrameCount;
     }
 
-    Error = snd_pcm_writei(GlobalAudio.Handle, Buffer, FramesToWrite);
+    Error = snd_pcm_writei(GlobalAudio->Handle, Buffer, FramesToWrite);
     if(Error < 0){
       printf("Error writing the frames!\n");
       break;
     }
-    printf("AUDIO: %ld, %d\n", FramesToWrite, GameAudio->SampleFrameIndexAudioThread);
+
   }
 
   Linux_Deallocate((void*)Buffer, BufferSize);
@@ -544,6 +527,8 @@ int main()
   }
 
   u32 Screen = DefaultScreen(display);
+  linux_audio Audio = {};
+  GlobalAudio = &Audio;
 
   Window rootWindow = RootWindow(display, Screen);
   Window window = XCreateSimpleWindow(display, rootWindow, 10, 10, GlobalScreenWidth, GlobalScreenHeight, 1, BlackPixel(display, Screen), WhitePixel(display, Screen));
@@ -626,32 +611,37 @@ int main()
     GameCode.GameUpdate(&GameMemory, &GameInput, &Pushbuffer);
     if(GameCode.GameGetSoundSamples)
     {
-      u32 SampleFramesToWrite = GlobalAudio.BufferFrameCount; // ToDo implement!
-      GameCode.GameGetSoundSamples(&GameMemory, &GlobalAudio.GameAudio, SampleFramesToWrite);
+      u32 SampleFramesToWrite = GlobalAudio->BufferFrameCount; // ToDo implement!
+      GameCode.GameGetSoundSamples(&GameMemory, &GlobalAudio->GameAudio, SampleFramesToWrite);
     }
     RenderCode.EndFrame(PlatformRenderer, &Pushbuffer);
 
   
     struct timespec EndOfFrame = Linux_GetTimeInSeconds();
     f32 FrameMinusSleep = Linux_GetMillisecondsElapsedF(StartOfFrame, EndOfFrame);
+    // printf("Work in frame: %.2lf\n", FrameMinusSleep);
 
     f32 TargetSleepTime =GlobalFramerateTargetMS - SleepError;
     if(FrameMinusSleep < TargetSleepTime)
     {
       f32 TimeToSleep = TargetSleepTime - FrameMinusSleep;
-      Linux_Sleep((u32)TimeToSleep);
-      f32 FrameTimeMSF       = Linux_GetMillisecondsElapsedF(StartOfFrame, Linux_GetTimeInSeconds());
-      printf("Time after first sleep %.2lf\n", FrameTimeMSF);
-      while(FrameTimeMSF < TargetSleepTime)
-      {
-        FrameTimeMSF = Linux_GetMillisecondsElapsedF(StartOfFrame, Linux_GetTimeInSeconds());
-      }
+      struct timespec BeforeSleepTime = Linux_GetTimeInSeconds();
+      Linux_Sleep(TimeToSleep);
+      struct timespec AfterSleepTime  = Linux_GetTimeInSeconds();
+      f32 FrameTimeMSF                = Linux_GetMillisecondsElapsedF(StartOfFrame, AfterSleepTime);
+      // printf("Time after sleep %.2lf, expected %.2lf\n", Linux_GetMillisecondsElapsedF(BeforeSleepTime, AfterSleepTime), TimeToSleep);
       SleepError = FrameTimeMSF - TargetSleepTime;
-      printf("Frame took %.2lf, Error %.2lf, Target: %.2lf, Frame: %.2lf, Slept for %.2lf\n", FrameTimeMSF, SleepError, TargetSleepTime, FrameMinusSleep, TimeToSleep);
+      // printf("Total time in frame %.2lf, Error %.2lf, Target: %.2lf\n", FrameTimeMSF, SleepError, TargetSleepTime);
     }
 
     // Figure out better way for this!
-    GlobalAudio.CanStart = true;
+    if(!GlobalAudio->CanStart)
+    {
+      pthread_mutex_lock(&GlobalAudio->Mutex);
+      GlobalAudio->CanStart = true;
+      pthread_cond_signal(&GlobalAudio->Condition);
+      pthread_mutex_unlock(&GlobalAudio->Mutex);
+    }
   }
 
   XDestroyWindow(display, window);

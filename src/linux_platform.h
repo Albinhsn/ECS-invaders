@@ -2,6 +2,7 @@
 #define LINUX_PLATFORM_H
 
 #include <X11/Xlib.h>
+#include <alsa/asoundlib.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -12,9 +13,19 @@
 #include <sys/sendfile.h>
 #include <unistd.h>
 #include <x86intrin.h>
- 
-
 #include "platform.h"
+
+typedef struct linux_audio
+{
+  snd_pcm_t * Handle;
+  game_audio GameAudio;
+  snd_pcm_uframes_t BufferFrameCount;
+  snd_pcm_uframes_t PeriodSize;
+  u32 Channels;
+  bool CanStart;
+  pthread_mutex_t Mutex;
+  pthread_cond_t Condition;
+}linux_audio;
 
 typedef struct linux_display_and_window
 {

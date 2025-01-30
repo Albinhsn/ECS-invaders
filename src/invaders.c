@@ -967,5 +967,4 @@ GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
   }
 
   Audio->SampleFrameIndexGameCode = (Audio->SampleFrameIndexGameCode + SampleFramesToWrite) % Audio->SampleFrameCount;
-  printf("GAME: %ld\n", Audio->SampleFrameIndexGameCode);
 }
