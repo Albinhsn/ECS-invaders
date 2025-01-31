@@ -1,28 +1,27 @@
 #include "common.h"
-#undef bool
+#include "pushbuffer.c"
 
-#include <emscripten.h>
-#include <emscripten/html5.h>
-#include <sys/stat.h>
-#include <sys/file.h>
-#include <GLES2/gl2.h>
-#include <stdio.h>
-#include <pthread.h>
-#include<dlfcn.h>
+#include "emscripten_platform.h"
 
 
 static u16                     GlobalScreenWidth       = 600;
 static u16                     GlobalScreenHeight      = 800;
 static s32                     GlobalShouldQuit        = 0;
-static u16                     GlobalFramerateTargetMS = 30;
 
+game_memory GlobalGameMemory = {};
+game_input  GlobalGameInput = {};
+emcc_audio  GlobalAudio = {};
+pushbuffer  GlobalPushbuffer = {};
+platform_renderer GlobalPlatformRenderer = {};
+
+emcc_game_code GameCode;
+emcc_render_code RenderCode;
 /*
 	* ToDo 
-	* 	Figure out if loading library works
-	* 		i.e figur out how files work
-	* 	Process Messages
-	* 	Use wasm worker instead of pthread?
 	* 	Audio
+  * 	Process messages
+  * 	Lower the amount of memory needed
+  * 	Create renderer(s)
 	*/
 
 void * EMCC_LibraryLoad(const char * Name){
@@ -36,30 +35,31 @@ void * EMCC_LibraryLoad(const char * Name){
 	return Library;
 }
 
-bool EMCC_FileHasChanged(u32 * FileLastChangedTimer, const char * Filename)
+void EMCC_LibraryFree(void * Handle)
+{
+	dlclose(Handle);
+}
+void * EMCC_GetProcAddress(void * Library, const char * Name)
+{
+	return dlsym(Library, Name);
+}
+
+
+bool EMCC_FileHasChanged(u64 * FileLastChangedTimer, const char * Filename)
 {
   struct stat FileStat;
   stat(Filename, &FileStat);
-	printf("Statd: %ld %ld\n", FileStat.st_mtime, *FileLastChangedTimer);
+	printf("Statd: %llu %llu\n", FileStat.st_mtime, *FileLastChangedTimer);
   if (FileStat.st_mtime != *FileLastChangedTimer)
   {
     *FileLastChangedTimer = FileStat.st_mtime;
-		printf("File changed, new timer: %ld\n", *FileLastChangedTimer);
+		printf("File changed, new timer: %llu\n", *FileLastChangedTimer);
     return true;
   }
 		printf("File didn't change\n");
   return false;
 }
 
-void EMCC_LibraryFree(void * Handle)
-{
-	dlclose(Handle);
-}
-
-void * EMCC_GetProcAddress(void * Library, const char * Name)
-{
-	return dlsym(Library, Name);
-}
 
 bool EMCC_ReadFile(arena * Arena, const char * Filename, u8 **FileBuffer, u32 * Size)
 {
@@ -69,16 +69,16 @@ bool EMCC_ReadFile(arena * Arena, const char * Filename, u8 **FileBuffer, u32 * 
 		printf("Failed to open file at '%s'\n", Filename);
 		return false;
 	}
-	printf("Opened file %ld\n", (u64)FD);
+	printf("Opened file %llu\n", (u64)FD);
 
 	fseek(FD, 0, SEEK_END);
 	*Size = ftell(FD);
 	fseek(FD, 0, SEEK_SET);
-	printf("Seeked, %ld\n", (u64)(*Size));
+	printf("Seeked, %llu\n", (u64)(*Size));
 
 	u8* Buffer = (u8*)Arena_Allocate(Arena, *Size + 1);
 	u32 Read = fread(Buffer, 1, *Size, FD);
-	printf("%ld\n", Read);
+	printf("%d\n", Read);
 	if(Read != *Size)
 	{
 		printf("Failed to read the file! '%s'\n", Filename);
@@ -133,9 +133,33 @@ void EMCC_Deallocate(void * Memory)
 	free(Memory);
 }
 
-void game_loop() {
-	float dt = 1.0f / (float)GlobalFramerateTargetMS;
+void EMCC_ProcessMessages()
+{
+
 }
+
+void EMCC_Frame() {
+	float dt = 1.0f / 60.0f;
+
+
+  // ToDo Process events
+  EMCC_ProcessMessages();
+  // What do we do when we want to quit?
+  
+  GameCode.GameUpdate(&GlobalGameMemory, &GlobalGameInput, &GlobalPushbuffer);
+  u32 SampleFramesToWrite = GlobalAudio.BufferFrameCount;
+  GameCode.GameGetSoundSamples(&GlobalGameMemory, &GlobalAudio.GameAudio, SampleFramesToWrite);
+  RenderCode.EndFrame(&GlobalPlatformRenderer, &GlobalPushbuffer);
+
+  if(!GlobalAudio.CanStart)
+  {
+    GlobalAudio.CanStart = true;
+    // Init audio here
+  }
+}
+
+void EMCC_LoadGameCode(){}
+void EMCC_LoadRenderCode(){}
 
 int main() {
 	EmscriptenWebGLContextAttributes attr;
@@ -147,35 +171,33 @@ int main() {
 	attr.preserveDrawingBuffer = 0;
 
 
-	// ALLOCATION
-	void * Memory = EMCC_Allocate(Megabyte(1));
-	printf("Memory: %ld\n", (u64)Memory);
+  u64   GameMemorySize = Megabyte(15);
+	void * Memory = EMCC_Allocate(GameMemorySize);
 
-	// READ FILE
-	arena Arena = {};
-	Arena_Create(&Arena, Memory, Megabyte(1));
-	printf("Created arena\n");
-	u8 * Buffer = 0;
-	u32 Size = 0;
-	EMCC_ReadFile(&Arena, "./assets/shaders.txt", &Buffer, &Size);
-	printf("%ld %ld\n", (u64)Buffer, Size);
+  arena GameArena = {};
+  Arena_Create(&GameArena, Memory, GameMemorySize);
 
-	EMCC_Deallocate(Memory);
+  game_memory GameMemory = {};
+  GameMemory.PermanentSize        = Megabyte(5);
+  GameMemory.PermanentStorage     = Arena_Allocate(&GameArena, GameMemory.PermanentSize);
+  GameMemory.TemporaryStorageSize = Megabyte(5);
+  GameMemory.TemporaryStorage     = Arena_Allocate(&GameArena, GameMemory.TemporaryStorageSize);
+  GameMemory.ReadFile             = EMCC_ReadFile;
 
-  void * Library = EMCC_LibraryLoad("./build/invaders.wasm");
-  printf("%ld\n", Library);
+  // ToDo Create the renderer
 
-	u64 FileLastChangedTimer = 5;
-	FileLastChangedTimer = 5;
-	const char * Filename = "./assets/shaders.txt";
-	bool FileChanged 			= EMCC_FileHasChanged(&FileLastChangedTimer, Filename);
-	printf("%ld %ld\n", FileChanged, FileLastChangedTimer);
+  EMCC_LoadGameCode();
+  EMCC_LoadRenderCode();
 
 
-	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context = emscripten_webgl_create_context("canvas", &attr);
-	emscripten_webgl_make_context_current(context);
+  u64        PushbufferMemorySize = Megabyte(1);
+  void*      PushbufferMemory     = Arena_Allocate(&GameArena, PushbufferMemorySize);
+  Pushbuffer_Create(&GlobalPushbuffer, PushbufferMemory, PushbufferMemorySize);
+
+  // ToDo Init audio
+
 	emscripten_set_canvas_element_size("#canvas", GlobalScreenWidth, GlobalScreenHeight);
 	
-	emscripten_set_main_loop(game_loop, 0, true);
+	// emscripten_set_main_loop(EMCC_Frame, 0, true);
 	return 0;
 }
