@@ -15,6 +15,12 @@ game:
 run:
 	../build/linux_platform
 
+web:
+	emcc ../src/emscripten_platform.c -sMAIN_MODULE=1 -O0 -pthread -s USE_WEBGL2=1 -s FULL_ES2=1 -s WASM=1 -o ../build/emscripten_platform.html -DPLATFORM_WEB=1 --shell-file ../src/shell.html --preload-file ../assets --preload-file ../build && emcc ../src/invaders.c -O3 -o ../build/invaders.wasm -sSIDE_MODULE=2 -DPLATFORM_WEB=1 -s EXPORT_ALL=1
+
+rw:
+	emrun ../build/emscripten_platform.html
+
 f:
 	make renderer && make platform && make game && make run
 
