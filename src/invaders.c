@@ -6,8 +6,12 @@
 #include "sound.c"
 #include "vector.c"
 #include <math.h>
-
 #include "ui.c"
+
+#if PLATFORM_WEB
+#include <emscripten.h>
+#endif
+
 sound* GetSoundByName(game_state* GameState, const char* SoundName)
 {
   string Name = {};
@@ -878,6 +882,9 @@ void LoadHighscores(arena * Arena, highscore * Highscores, u32 * HighscoreCount)
 }
 
 
+#if PLATFORM_WEB
+EMSCRIPTEN_KEEPALIVE
+#endif
 GAME_UPDATE(GameUpdate)
 {
 
@@ -908,6 +915,9 @@ void OutputSineWave(u32 SamplesPerSecond, u32 SampleCount, f32* Samples, f32 Ton
   }
 }
 
+#if PLATFORM_WEB
+EMSCRIPTEN_KEEPALIVE
+#endif
 GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 {
   game_state* GameState              = (game_state*)Memory->PermanentStorage;

@@ -5,17 +5,16 @@
 #include "windows.h"
 #elif PLATFORM_LINUX
 #include <arpa/inet.h>
-#include <string.h>
 #include <stdarg.h>
 #elif PLATFORM_WEB
 #include <arpa/inet.h>
-#include <string.h>
 #include <stdarg.h>
 #endif
 
 #include <stdint.h>
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 #include <stdlib.h>
 typedef uint8_t  u8;
 typedef uint16_t u16;
@@ -33,7 +32,7 @@ typedef double   f64;
 #define true              1
 #define false             0
 
-// #define bool              u32
+#define bool              u32
 #define PI                3.141592653589793f
 
 #define Kilobyte(size)    (size * 1024LL)

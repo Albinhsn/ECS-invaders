@@ -1,10 +1,12 @@
+#include "common.h"
+#undef bool
+
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <sys/stat.h>
 #include <sys/file.h>
 #include <GLES2/gl2.h>
 #include <stdio.h>
-#include "common.h"
 #include <pthread.h>
 #include<dlfcn.h>
 
@@ -16,6 +18,8 @@ static u16                     GlobalFramerateTargetMS = 30;
 
 /*
 	* ToDo 
+	* 	Figure out if loading library works
+	* 		i.e figur out how files work
 	* 	Process Messages
 	* 	Use wasm worker instead of pthread?
 	* 	Audio
@@ -32,15 +36,18 @@ void * EMCC_LibraryLoad(const char * Name){
 	return Library;
 }
 
-bool EMCC_FileHasChanged(u64 * FileLastChangedTimer, const char * Filename)
+bool EMCC_FileHasChanged(u32 * FileLastChangedTimer, const char * Filename)
 {
   struct stat FileStat;
   stat(Filename, &FileStat);
+	printf("Statd: %ld %ld\n", FileStat.st_mtime, *FileLastChangedTimer);
   if (FileStat.st_mtime != *FileLastChangedTimer)
   {
     *FileLastChangedTimer = FileStat.st_mtime;
+		printf("File changed, new timer: %ld\n", *FileLastChangedTimer);
     return true;
   }
+		printf("File didn't change\n");
   return false;
 }
 
@@ -57,13 +64,21 @@ void * EMCC_GetProcAddress(void * Library, const char * Name)
 bool EMCC_ReadFile(arena * Arena, const char * Filename, u8 **FileBuffer, u32 * Size)
 {
 	FILE * FD = fopen(Filename, "r");
+	if(FD == 0)
+	{
+		printf("Failed to open file at '%s'\n", Filename);
+		return false;
+	}
+	printf("Opened file %ld\n", (u64)FD);
 
 	fseek(FD, 0, SEEK_END);
 	*Size = ftell(FD);
 	fseek(FD, 0, SEEK_SET);
+	printf("Seeked, %ld\n", (u64)(*Size));
 
 	u8* Buffer = (u8*)Arena_Allocate(Arena, *Size + 1);
 	u32 Read = fread(Buffer, 1, *Size, FD);
+	printf("%ld\n", Read);
 	if(Read != *Size)
 	{
 		printf("Failed to read the file! '%s'\n", Filename);
@@ -131,10 +146,36 @@ int main() {
 	attr.antialias = 1;
 	attr.preserveDrawingBuffer = 0;
 
+
+	// ALLOCATION
+	void * Memory = EMCC_Allocate(Megabyte(1));
+	printf("Memory: %ld\n", (u64)Memory);
+
+	// READ FILE
+	arena Arena = {};
+	Arena_Create(&Arena, Memory, Megabyte(1));
+	printf("Created arena\n");
+	u8 * Buffer = 0;
+	u32 Size = 0;
+	EMCC_ReadFile(&Arena, "./assets/shaders.txt", &Buffer, &Size);
+	printf("%ld %ld\n", (u64)Buffer, Size);
+
+	EMCC_Deallocate(Memory);
+
+  void * Library = EMCC_LibraryLoad("./build/invaders.wasm");
+  printf("%ld\n", Library);
+
+	u64 FileLastChangedTimer = 5;
+	FileLastChangedTimer = 5;
+	const char * Filename = "./assets/shaders.txt";
+	bool FileChanged 			= EMCC_FileHasChanged(&FileLastChangedTimer, Filename);
+	printf("%ld %ld\n", FileChanged, FileLastChangedTimer);
+
+
 	EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context = emscripten_webgl_create_context("canvas", &attr);
 	emscripten_webgl_make_context_current(context);
 	emscripten_set_canvas_element_size("#canvas", GlobalScreenWidth, GlobalScreenHeight);
 	
-	emscripten_set_main_loop(game_loop, GlobalFramerateTargetMS, true);
+	emscripten_set_main_loop(game_loop, 0, true);
 	return 0;
 }
