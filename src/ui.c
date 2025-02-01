@@ -13,8 +13,10 @@ float UI_PushPrefWidth(float Width){return Width;}
 void  UI_PopPrefWidth(){}
 float UI_PushPrefHeight(float Height){return Height;}
 void  UI_PopPrefHeight(){}
-ui_box * UI_PushParent(){return 0;}
+float UI_PushPrefFontSize(float Size){return Size;}
+void  UI_PopFontSize(){}
 ui_box * UI_PopParent(){return 0;}
+ui_box * UI_PushParent(){return 0;}
 
 void UI_Init(void * Memory, u64 MemorySize, u32 MaxWidgetCount)
 {
@@ -25,8 +27,17 @@ void UI_Init(void * Memory, u64 MemorySize, u32 MaxWidgetCount)
   UI = (ui_state*)Arena_Allocate(&Arena, sizeof(ui_state));
 
   // Allocate Widget Pool
-  // Allocate build arenas
+  u64 WidgetSize  = sizeof(Widget);
+  void * Memory   = Arena_Allocate(&Arena, WidgetSize * MaxWidgetCount);
+  Pool_Create(&UI->WidgetPool, Memory, WidgetSize);
 
+  s64 RemainingMemory = Arena->Size - Arena->Offset;
+  Assert(RemainingMemory > 0);
+
+  s64 BuildMemorySize = RemainingMemory / 2;
+  Arena_Create(Ui->BuildArenas[0], (u8*)Arena->Memory + Arena->Offset, BuildMemorySize);
+  Arena->Offset += BuildMemorySize;
+  Arena_Create(Ui->BuildArenas[1], (u8*)Arena->Memory + Arena->Offset, BuildMemorySize);
 }
 
 string UI_GetStringFromKeyString(string String)
@@ -90,7 +101,16 @@ u64 UI_KeyFromString(string String)
 
 ui_box * UI_BoxFromKey(u64 Key)
 {
-  return 0;
+  ui_box * Head = UI->Persistent;
+  while(Head)
+  {
+    if(Head->Key == Key)
+    {
+      break;
+    }
+    Head = Head->Next;
+  }
+  return Head;
 }
 
 ui_box * UI_BoxMake(ui_box_flags Flags, string String)
@@ -138,15 +158,42 @@ void UI_BeginFrame(os_event * Events, u32 EventCount, f32 DeltaTime)
   UI->DeltaTime     = DeltaTime;
   UI->Events        = Events;
   UI->EventCount   = EventCount;
-  // Reset and swap arenas
 
+  // Reset and swap arenas
+  arena * NextArena    = &UI->BuildArenas[(++UI->BuildIndex)  % BUILD_ARENA_COUNT];
+  Arena_Clear(NextArena);
 
 
   // Create root
+  ui_box * Root   = UI_BoxMakeF(0, "Root");
+  Root->PrefSize  = V2f(1.0f, 1.0f);
+  Root->Rect.Min  = V2f(0, 0);
+  Root->Rect.Max  = UI->WindowDim;
+  Root->ChildLayoutAxis = Axis2_Y;
+  UI_PushParent(Root);
 
   // Prune boxes
+  ui_box * Persistent = UI->Persistent;
+  while(Persistent)
+  {
+    ui_box * Next = Persistent->Next;
+    if(Persistent->LastTouchedBuildIndex != UI->BuildIndex)
+    {
+      // Prune the box
+      if(Next)
+      {
+        Next->Prev             = Persistent->Prev;
+      }
+      if(Persistent->Prev)
+      {
+        Persistent->Prev->Next = Next;
+      }
+      Pool_Free(&UI->WidgetPool, (u64)Persistent);
+    }
+    Persistent = Next;
+  }
 
-  // Check that stacks have been popped!
+  UI->BuildIndex++;
   // Push defaults
 
 }
@@ -177,8 +224,13 @@ void UI_EndFrame()
   // Pop root
 
   // Calc the sizes for each axis
+  for(axis2 Axis = Axis2_X; Axis < Axis2_Count; Axis++)
+  {
+    UI_LayoutRoot(UI->Root, Axis);
+  }
 
   // Push draw commands
+  
 }
 
 
@@ -194,7 +246,13 @@ ui_signal UI_Spacer(float Space)
 
 ui_signal UI_Text(const char * Text)
 {
-  return (ui_signal){};
+  string String = {};
+  String_Build(&UI_Arena, &String, Text);
+
+  ui_box * Box      = UI_BoxMake(UI_BoxFlag_DrawText, String);
+  ui_signal Signal  = UI_BoxGetSignal(Box);
+
+  return Signal;
 }
 
 ui_signal UI_Button(const char * Text)

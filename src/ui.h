@@ -7,12 +7,15 @@
 
 #define UI_FillHeight()
 #define UI_FillWidth()
+#define UI_BuildArena UI->BuildArenas[UI->BuildIndex]
 
 
 #define UI_ChildLayoutAxis(Axis) DeferLoop(UI_PushChildLayoutAxis(Axis), UI_PopChildLayoutAxis())
 #define UI_Padding(Padding) DeferLoop(UI_PushPadding(Padding), UI_PopPadding())
 #define UI_PrefWidth(Width) DeferLoop(UI_PushPrefWidth(Width), UI_PopPrefWidth())
 #define UI_PrefHeight(Height) DeferLoop(UI_PushPrefHeight(Height), UI_PopPrefHeight())
+#define UI_FontSize(Size) DeferLoop(UI_PushPrefFontSize(Size), UI_PopFontSize())
+#define UI_FontColor(Color)DeferLoop(UI_PushFontColor(Size), UI_PopFontColor())
 
 #define UI_TopParent() 0
 #define UI_TopChildLayoutAxis() 0
@@ -171,11 +174,12 @@ typedef struct ui_rect_node ui_rect_node;
 struct ui_rect_node {ui_rect_node * Next; ui_box * Box;};
 
 typedef struct os_event os_event;
+#define BUILD_ARENA_COUNT 2
 typedef struct ui_state
 {
 
   pool_allocator WidgetPool;
-  arena BuildArenas[2];
+  arena BuildArenas[BUILD_ARENA_COUNT];
   u64   BuildIndex;
 
   // Build output
@@ -194,6 +198,10 @@ typedef struct ui_state
   ui_text_size_node *      TextSizeHead;
   ui_text_color_node    *  TextColorHead;
   ui_border_color_node   * BorderColorHead;
+
+  // Persistent
+  ui_box * Persistent;
+
 }ui_state;
 
 

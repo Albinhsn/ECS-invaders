@@ -829,6 +829,35 @@ void SimulateGame(game_state* GameState, game_memory* Memory, game_input* Input,
   GameState->Score += GameState->DeltaTime * 1000;
   Pushbuffer_PushClear(Pushbuffer, 0xFF00FFFF);
 
+  // Omega slow :)
+  // Arena_Clear(&GameState->TemporaryArena);
+
+#if 1
+  UseInput(GameState, Input);
+  ExecuteNewCommands(GameState);
+  UpdatePhysics(GameState);
+  HandleEnemyShooting(GameState);
+  CollisionDetection(GameState, Pushbuffer);
+  CleanupEntities(GameState);
+
+  RenderObjects(GameState, Pushbuffer);
+  RenderHealth(GameState, Pushbuffer);
+#endif
+
+  string* ScoreString = &GameState->ScoreString;
+  ScoreString->Length = sprintf_s((char*)ScoreString->Buffer, ScoreString->Allocated, "Score: %d", (u32)(GameState->Score / 1000.0f));
+  Pushbuffer_PushText(Pushbuffer, ScoreString, &GameState->Font, UI_TextAlignment_Centered, V2f(GameState->ScreenWidth * 0.80f, GameState->ScreenHeight * 0.05f), 40, 0x00FF0000);
+}
+
+void LoadHighscores(arena * Arena, highscore * Highscores, u32 * HighscoreCount)
+{
+}
+
+
+GAME_UPDATE(GameUpdate)
+{
+
+  game_state* GameState = (game_state*)Memory->PermanentStorage;
   if (!Memory->IsInitialized)
   {
     // Initialize GameArena
@@ -857,67 +886,104 @@ void SimulateGame(game_state* GameState, game_memory* Memory, game_input* Input,
     CreatePlayer(GameState);
     Memory->IsInitialized = true;
   }
-  // Omega slow :)
-  // Arena_Clear(&GameState->TemporaryArena);
 
-#if 1
-  UseInput(GameState, Input);
-  ExecuteNewCommands(GameState);
-  UpdatePhysics(GameState);
-  HandleEnemyShooting(GameState);
-  CollisionDetection(GameState, Pushbuffer);
-  CleanupEntities(GameState);
-
-  RenderObjects(GameState, Pushbuffer);
-  RenderHealth(GameState, Pushbuffer);
-#endif
-
-  string* ScoreString = &GameState->ScoreString;
-  ScoreString->Length = sprintf_s((char*)ScoreString->Buffer, ScoreString->Allocated, "Score: %d", (u32)(GameState->Score / 1000.0f));
-  Pushbuffer_PushText(Pushbuffer, ScoreString, &GameState->Font, UI_TextAlignment_Centered, V2f(GameState->ScreenWidth * 0.80f, GameState->ScreenHeight * 0.05f), 40, 0x00FF0000);
-}
-
-void LoadHighscores(arena * Arena, highscore * Highscores, u32 * HighscoreCount)
-{
-}
-
-
-#if PLATFORM_WEB
-EMSCRIPTEN_KEEPALIVE
-#endif
-GAME_UPDATE(GameUpdate)
-{
-
-  game_state* GameState = (game_state*)Memory->PermanentStorage;
-  SimulateGame(GameState, Memory, Input, Pushbuffer);
-}
-
-#include <math.h>
-#define TAU (PI * 2)
-void OutputSineWave(u32 SamplesPerSecond, u32 SampleCount, f32* Samples, f32 ToneHz, f32 ToneVolume)
-{
-  static f64 TSine      = 0;
-
-  f32        WavePeriod = SamplesPerSecond / ToneHz;
-
-  for (u32 SampleIndex = 0; SampleIndex < SampleCount; SampleIndex++)
+  switch (GameState->State)
   {
-    f32 Sine   = (f32)sin(TSine);
-    f32 Sample = (f32)(Sine * ToneVolume);
-    *Samples++ = Sample;
-    *Samples++ = Sample;
+  case GameState_MainMenu:
+  {
+    // Push Clear
+    Pushbuffer_PushClear(Pushbuffer, 0x0);
+    UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
 
-    TSine += TAU / WavePeriod;
-    if (TSine >= TAU)
+
+    // Define screen space
+    UI_FillHeight()
+    UI_PrefWidth(0.6f)
+    UI_ChildLayoutAxis(Axis2_Y)
+    UI_Padding(0.15f)
     {
-      TSine -= TAU;
+
+      UI_FontSize(0.1f)
+      {
+        UI_Text("Invaders");
+      }
+
+      // Three main buttons
+      UI_PrefWidth(0.8f)
+      UI_PrefHeight(0.15f)
+      UI_Padding(0.1f)
+      {
+        if(UI_Button("START").Flags & UI_SignalFlag_LeftClicked)
+        {
+          GameState->State = GameState_GameRunning;
+        }
+
+        UI_Spacer(0.05f);
+        if(UI_Button("HIGHSCORE").Flags & UI_SignalFlag_LeftClicked)
+        {
+          GameState->State = GameState_ShowHighscore;
+        }
+
+        UI_Spacer(0.05f);
+        if(UI_Button("QUIT").Flags & UI_SignalFlag_LeftClicked)
+        {
+          Assert(0);
+        }
+      }
     }
+    UI_EndFrame();
+    break;
   }
+  case GameState_InputName:
+  {
+    Pushbuffer_PushClear(Pushbuffer, 0x0);
+    UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
+    highscore *Highscores = GameState->Highscores;
+    if(Highscores == 0)
+    {
+      // Load highscores
+      // How do we deal with memory here?
+      LoadHighscores(&GameState->PermanentArena, Highscores, &GameState->HighscoreCount);
+    }
+
+    if(GameState->Highscores)
+    {
+      bool IsNewEntry = true;
+      if(IsNewEntry)
+      {
+          // Create score text
+          // Create ui input
+          // Create ui continue button
+      }
+      else
+      {
+        GameState->State = GameState_ShowHighscore;
+      }
+    }
+    break;
+  }
+  case GameState_GameRunning:
+  {
+    // Check if we're in main menu, running game, input name, end game
+    SimulateGame(GameState, Memory, Input, Pushbuffer);
+    UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
+    // Show score text
+    // Render Health (but not via ui!)
+    break;
+  }
+  case GameState_ShowHighscore:
+  {
+    Pushbuffer_PushClear(Pushbuffer, 0x0);
+    UI_BeginFrame(Input->Events, Input->EventCount, GameState->DeltaTime);
+
+    // Draw highscores
+    // Draw back button
+    break;
+  }
+  }
+  UI_EndFrame();
 }
 
-#if PLATFORM_WEB
-EMSCRIPTEN_KEEPALIVE
-#endif
 GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 {
   game_state* GameState              = (game_state*)Memory->PermanentStorage;
