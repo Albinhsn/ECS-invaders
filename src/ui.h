@@ -10,19 +10,22 @@
 #define UI_BuildArena UI->BuildArenas[UI->BuildIndex]
 
 
+#define UI_Font(Font) DeferLoop(UI_PushFont(Axis), UI_PopFont())
 #define UI_ChildLayoutAxis(Axis) DeferLoop(UI_PushChildLayoutAxis(Axis), UI_PopChildLayoutAxis())
 #define UI_Padding(Padding) DeferLoop(UI_PushPadding(Padding), UI_PopPadding())
-#define UI_PrefWidth(Width) DeferLoop(UI_PushPrefWidth(Width), UI_PopPrefWidth())
-#define UI_PrefHeight(Height) DeferLoop(UI_PushPrefHeight(Height), UI_PopPrefHeight())
+#define UI_PrefSize(Size) DeferLoop(UI_PushPrefSize(Size), UI_PopPrefSize())
 #define UI_FontSize(Size) DeferLoop(UI_PushPrefFontSize(Size), UI_PopFontSize())
 #define UI_FontColor(Color)DeferLoop(UI_PushFontColor(Size), UI_PopFontColor())
 
-#define UI_TopParent() 0
-#define UI_TopChildLayoutAxis() 0
-#define UI_TopTextAlignment() 0
-#define UI_TopFont() 0
-#define UI_TopFontSize() 0
-#define UI_TopFontColor() (vec4f){}
+#define UI_TopParent() UI->ParentHead->Parent;
+#define UI_TopChildLayoutAxis() UI->ChildLayoutAxisHead->ChildLayoutAxis;
+#define UI_TopTextAlignment() UI->TextAlignmentHead->TextAlignment;
+#define UI_TopFont() UI->FontHead->Font;
+#define UI_TopFontSize() UI->FontSizeHead->FontSize;
+#define UI_TopFontColor() UI->FontColorHead->FontColor;
+#define UI_TopBackgroundColor() UI->BackgroundColorHead->BackgroundColor;
+#define UI_TopBorderColor() UI->BorderColorHead->BorderColor;
+#define UI_TopBorderThickness() UI->BorderThicknessHead->BorderThickness;
 
 /*
 GOALS
@@ -102,8 +105,10 @@ typedef struct ui_box ui_box;
 struct ui_box
 {
   // Links
+	// First and last child
   ui_box * First;
   ui_box * Last;
+	// Next and Prev are same row (same parent)
   ui_box * Next;
   ui_box * Prev;
   ui_box * Parent;
@@ -115,13 +120,14 @@ struct ui_box
   ui_box_flags Flags;
   string String;
 
+	f32 Padding;
   vec2f FixedPosition;
   vec2f FixedSize;
   vec2f PrefSize;
   axis2 ChildLayoutAxis;
   // Hoist this to something about text
   msdf_font * Font;
-  f32 FontSize;
+  f32 	FontSize;
   vec4f FontColor;
   ui_text_alignment TextAlignment;
   // Hoist this to something about rect
@@ -155,23 +161,7 @@ typedef struct ui_signal
   ui_signal_flags Flags;
 }ui_signal;
 
-typedef struct ui_child_layout_node ui_child_layout_node;
-struct ui_child_layout_node {ui_child_layout_node * Next; ui_box * Box;};
-
-typedef struct ui_text_alignment_node ui_text_alignment_node;
-struct ui_text_alignment_node {ui_text_alignment_node * Next; ui_box * Box;};
-
-typedef struct ui_text_size_node ui_text_size_node;
-struct ui_text_size_node {ui_text_size_node * Next; ui_box * Box;};
-
-typedef struct ui_text_color_node ui_text_color_node;
-struct ui_text_color_node {ui_text_color_node * Next; ui_box * Box;};
-
-typedef struct ui_border_color_node ui_border_color_node;
-struct ui_border_color_node {ui_border_color_node * Next; ui_box * Box;};
-
-typedef struct ui_rect_node ui_rect_node;
-struct ui_rect_node {ui_rect_node * Next; ui_box * Box;};
+typedef struct pushbuffer pushbuffer;
 
 typedef struct os_event os_event;
 #define BUILD_ARENA_COUNT 2
@@ -181,6 +171,8 @@ typedef struct ui_state
   pool_allocator WidgetPool;
   arena BuildArenas[BUILD_ARENA_COUNT];
   u64   BuildIndex;
+	pushbuffer * Pushbuffer;
+	msdf_font * Font;
 
   // Build output
   ui_box * Root;
@@ -193,11 +185,19 @@ typedef struct ui_state
   vec2f      WindowDim;
 
   // Build stacks
-  ui_child_layout_node *   ChildLayoutHead;
-  ui_text_alignment_node * TextAlignmentHead;
-  ui_text_size_node *      TextSizeHead;
-  ui_text_color_node    *  TextColorHead;
-  ui_border_color_node   * BorderColorHead;
+  ui_box *   ChildLayoutAxisHead;
+  ui_box * 	 TextAlignmentHead;
+  ui_box *   TextSizeHead;
+  ui_box *   TextColorHead;
+  ui_box *   BorderColorHead;
+  ui_box *   BackgroundColorHead;
+  ui_box *   BorderThicknessHead;
+  ui_box *   PaddingHead;
+  ui_box *   PrefSizeHead;
+  ui_box *   ParentHead;
+	ui_box *   FontHead;
+  ui_box *   FontSizeHead;
+  ui_box *   FontColorHead;
 
   // Persistent
   ui_box * Persistent;

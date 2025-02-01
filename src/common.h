@@ -2,6 +2,7 @@
 #define COMMON_H
 
 #if PLATFORM_WINDOWS
+#include <stdarg.h>
 #include "windows.h"
 #elif PLATFORM_LINUX
 #include <arpa/inet.h>
@@ -11,11 +12,11 @@
 #include <stdarg.h>
 #endif
 
+#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
-#include <stdlib.h>
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
@@ -42,7 +43,7 @@ typedef double   f64;
 
 #define sprintf_s(buffer, ...) snprintf((buffer), __VA_ARGS__)
 
-#if PLATFORM_WINDOW | PLATFORM_LINUX
+#if PLATFORM_WINDOWS | PLATFORM_LINUX
 #define Assert(Expr)                                                                                                                                                                                   \
   {                                                                                                                                                                                                    \
     if (!(Expr)){                                                                                                                                                                                       \
@@ -85,6 +86,14 @@ void* Arena_Allocate(arena* Arena, u64 Size)
 
   return Pointer;
 }
+void Memcpy(u8* Dest, u8* Src, u32 Count)
+{
+
+  for (u32 BufferIndex = 0; BufferIndex < Count; BufferIndex++)
+  {
+    Dest[BufferIndex] = Src[BufferIndex];
+  }
+}
 
 typedef struct string
 {
@@ -98,6 +107,21 @@ void String_Create(arena* Arena, string* String, u32 Length)
   String->Buffer    = (u8*)Arena_Allocate(Arena, Length);
   String->Length    = 0;
   String->Allocated = Length;
+}
+
+void String_Format(arena * Arena, string * String, const char * Fmt, va_list Args)
+{
+	char Buffer[1024] = {};
+#if PLATFORM_WINDOWS
+	u32 Written = sprintf_s(Buffer, ArrayCount(Buffer), Fmt, Args);
+	Assert(Written != ArrayCount(Buffer) && "Woopsie");
+	String->Length = Written;
+	String->Buffer = (u8*)Arena_Allocate(Arena, Written);
+	Memcpy(String->Buffer, (u8*)Buffer, Written);
+		
+#else
+		Assert(0 && "Pls implement!");
+#endif
 }
 
 typedef struct texture texture;
@@ -122,14 +146,6 @@ typedef struct pool_allocator
   pool_free_node* Head;
 } pool_allocator;
 
-void Memcpy(u8* Dest, u8* Src, u32 Count)
-{
-
-  for (u32 BufferIndex = 0; BufferIndex < Count; BufferIndex++)
-  {
-    Dest[BufferIndex] = Src[BufferIndex];
-  }
-}
 
 bool IsDigit(u8 Char)
 {
@@ -234,11 +250,12 @@ u64 AlignOffset(u64 offset, u64 alignment)
 }
 
 #define DEFAULT_ALIGNMENT 16
-void Pool_Create(pool_allocator* Pool, void* Memory, u64 ChunkSize)
+void Pool_Create(pool_allocator* Pool, void* Memory, u64 ChunkSize, u64 Count)
 {
   Pool->Memory    = Memory;
-  Pool->ChunkSize = AlignOffset(ChunkSize, DEFAULT_ALIGNMENT);
+  Pool->ChunkSize = ChunkSize;
   Pool->Head      = 0;
+	Pool->Size 			= ChunkSize * Count;
 
   Pool_Free_All(Pool);
 }

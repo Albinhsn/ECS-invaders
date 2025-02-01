@@ -3,41 +3,62 @@
 ui_state * UI;
 
 #define UI_Arena (UI->BuildArenas[0])
-#define BoxNull 0
+#define BoxIsNull(Box) ((Box) == 0)
 
-axis2 UI_PushChildLayoutAxis(axis2 Axis){return Axis;}
-void  UI_PopChildLayoutAxis(){}
-float UI_PushPadding(float Padding){return Padding;}
-void  UI_PopPadding(){}
-float UI_PushPrefWidth(float Width){return Width;}
-void  UI_PopPrefWidth(){}
-float UI_PushPrefHeight(float Height){return Height;}
-void  UI_PopPrefHeight(){}
-float UI_PushPrefFontSize(float Size){return Size;}
-void  UI_PopFontSize(){}
-ui_box * UI_PopParent(){return 0;}
-ui_box * UI_PushParent(){return 0;}
+#define UI_PushValue(value, type)\
+	ui_box * Box = (ui_box*)Arena_Allocate(&UI_Arena, sizeof(ui_box));\
+	Box->##type## = value;\
+	if(BoxIsNull(UI->##type##Head))\
+	{\
+		UI->##type##Head = Box;\
+	}else\
+	{\
+		UI->##type##Head->Prev = Box;\
+		Box->Next = UI->##type##Head;\
+		UI->##type##Head = Box;\
+	}\
+	return value;\
 
-void UI_Init(void * Memory, u64 MemorySize, u32 MaxWidgetCount)
+#define UI_PopValue(type)\
+	ui_box * Out = UI->##type##Head;\
+	UI->##type##Head = Out->Next;\
+	if(Out->Next){\
+		UI->##type##Head->Prev =0;\
+	}\
+
+// ToDo implement these
+axis2 UI_PushChildLayoutAxis(axis2 Axis){ UI_PushValue(Axis, ChildLayoutAxis) }
+void  UI_PopChildLayoutAxis(){UI_PopValue(ChildLayoutAxis)}
+float UI_PushPadding(float Value){ UI_PushValue(Value, Padding) }
+void  UI_PopPadding(){UI_PopValue(Padding)}
+vec2f UI_PushPrefSize(vec2f Size){UI_PushValue(Size, PrefSize)}
+void  UI_PopPrefSize(){UI_PopValue(PrefSize)}
+float UI_PushPrefFontSize(float Size){UI_PushValue(Size, FontSize)}
+void  UI_PopFontSize(){UI_PopValue(FontSize)}
+ui_box * UI_PushParent(ui_box * P){UI_PushValue(P, Parent)}
+void UI_PopParent(){UI_PopValue(Parent)}
+
+msdf_font* UI_PushFont(msdf_font* F_){UI_PushValue(F_, Font)}
+void UI_PopFont(){UI_PopValue(Font)}
+
+void UI_Init(arena * Arena, pushbuffer * Pushbuffer, u32 MaxWidgetCount)
 {
-  arena Arena = {};
-  Arena_Create(&Arena, Memory, MemorySize);
 
   // Allocate UI State
-  UI = (ui_state*)Arena_Allocate(&Arena, sizeof(ui_state));
+  UI = (ui_state*)Arena_Allocate(Arena, sizeof(ui_state));
+	UI->Pushbuffer = Pushbuffer;
 
   // Allocate Widget Pool
-  u64 WidgetSize  = sizeof(Widget);
-  void * Memory   = Arena_Allocate(&Arena, WidgetSize * MaxWidgetCount);
-  Pool_Create(&UI->WidgetPool, Memory, WidgetSize);
+  u64 WidgetSize  = sizeof(ui_box);
+  void * UIMemory   = Arena_Allocate(Arena, WidgetSize * MaxWidgetCount);
+  Pool_Create(&UI->WidgetPool, UIMemory, WidgetSize, MaxWidgetCount);
 
-  s64 RemainingMemory = Arena->Size - Arena->Offset;
-  Assert(RemainingMemory > 0);
 
-  s64 BuildMemorySize = RemainingMemory / 2;
-  Arena_Create(Ui->BuildArenas[0], (u8*)Arena->Memory + Arena->Offset, BuildMemorySize);
-  Arena->Offset += BuildMemorySize;
-  Arena_Create(Ui->BuildArenas[1], (u8*)Arena->Memory + Arena->Offset, BuildMemorySize);
+	u64 BuildMemorySize = Megabyte(1);
+	void * BuildMemory = Arena_Allocate(Arena, BuildMemorySize);
+  Arena_Create(&UI->BuildArenas[0], BuildMemory, BuildMemorySize);
+	BuildMemory = Arena_Allocate(Arena, BuildMemorySize);
+  Arena_Create(&UI->BuildArenas[1], BuildMemory, BuildMemorySize);
 }
 
 string UI_GetStringFromKeyString(string String)
@@ -125,8 +146,22 @@ ui_box * UI_BoxMake(ui_box_flags Flags, string String)
   }
 
   ui_box * Parent = UI_TopParent();
-  // Insert it into the tree
-  // Also clear other links
+	if(Parent == 0)
+	{
+		UI->Root = Parent;
+	}else
+	{
+		if(Parent->First == 0)
+		{
+			Parent->First = Parent->Last = Box;
+			Box->Next = Box->Prev = 0;
+		}else
+		{
+			Box->Prev = Parent->Last;
+			Parent->Last->Next = Box;
+		}
+	}
+	
 
   // Push the default values on to it
   Box->ChildCount = 0;
@@ -143,14 +178,22 @@ ui_box * UI_BoxMake(ui_box_flags Flags, string String)
   }
   if(Box->Flags & (UI_BoxFlag_DrawBackground | UI_BoxFlag_DrawBorder))
   {
-
+		Box->BackgroundColor 	= UI_TopBackgroundColor();
+		Box->BorderColor 			= UI_TopBorderColor();
+		Box->BorderThickness  = UI_TopBorderThickness();
   }
+
   return Box;
 }
 
-ui_box * UI_BoxMakeF(ui_box_flags Flags, const char * fmt, ...)
+ui_box * UI_BoxMakeF(ui_box_flags Flags, const char * String, ...)
 {
-  return 0;
+	string FormattedString = {};
+	va_list Args;
+	va_start(Args,String); 
+	String_Format(&UI_BuildArena, &FormattedString, String, Args);
+
+  return UI_BoxMake(Flags, FormattedString);
 }
 
 void UI_BeginFrame(os_event * Events, u32 EventCount, f32 DeltaTime)
@@ -170,7 +213,7 @@ void UI_BeginFrame(os_event * Events, u32 EventCount, f32 DeltaTime)
   Root->Rect.Min  = V2f(0, 0);
   Root->Rect.Max  = UI->WindowDim;
   Root->ChildLayoutAxis = Axis2_Y;
-  UI_PushParent(Root);
+	UI->Root = Root;
 
   // Prune boxes
   ui_box * Persistent = UI->Persistent;
@@ -196,6 +239,12 @@ void UI_BeginFrame(os_event * Events, u32 EventCount, f32 DeltaTime)
   UI->BuildIndex++;
   // Push defaults
 
+  UI_PushParent(Root);
+	UI_PushFont(UI->Font);
+	UI_PushPadding(0);
+	UI_PushPrefSize(V2f(1.0f, 1.0f));
+	UI_PushPrefFontSize(40);
+	UI_PushChildLayoutAxis(Axis2_Y);
 }
 
 void UI_SolveIndependentSizes(ui_box * Box, axis2 Axis)
@@ -219,9 +268,30 @@ void UI_LayoutRoot(ui_box * Box, axis2 Axis)
   UI_SolveSizeViolations(Box, Axis);
 }
 
+void UI_RenderBox(ui_box * Box)
+{
+	pushbuffer * Pushbuffer = UI->Pushbuffer;
+	while(Box)
+	{
+		if(Box->Flags & UI_BoxFlag_DrawText)
+		{
+			Pushbuffer_PushText(Pushbuffer, &Box->String, Box->Font,
+												  Box->TextAlignment, Box->FixedPosition,
+											 		(u32)Box->FontSize, Color_vec4fToU32(Box->FontColor));
+		}
+
+		ui_box * Child = Box->First;
+		while(Child != Box->Last)
+		{
+			UI_RenderBox(Child);
+			Child = Child->Next;
+		}
+		Box = Box->Next;
+	}
+}
+
 void UI_EndFrame()
 {
-  // Pop root
 
   // Calc the sizes for each axis
   for(axis2 Axis = Axis2_X; Axis < Axis2_Count; Axis++)
@@ -230,7 +300,13 @@ void UI_EndFrame()
   }
 
   // Push draw commands
-  
+  ui_box * Box = UI->Root;
+	UI_RenderBox(Box);
+
+
+	UI->Root = 0;
+
+	// ToDo Pop defaults
 }
 
 

@@ -2,10 +2,10 @@
 #include "entity.c"
 #include "image.c"
 #include "platform.h"
-#include "pushbuffer.c"
 #include "sound.c"
 #include "vector.c"
 #include <math.h>
+#include "pushbuffer.c"
 #include "ui.c"
 
 #if PLATFORM_WEB
@@ -864,8 +864,11 @@ GAME_UPDATE(GameUpdate)
 
     GameState->ScreenWidth   = Memory->ScreenWidth;
     GameState->ScreenHeight  = Memory->ScreenHeight;
+		GameState->State 				 = GameState_MainMenu;
     u64 PermanentStorageSize = Memory->PermanentSize - (sizeof(game_state));
     Arena_Create(&GameState->PermanentArena, (u8*)Memory->PermanentStorage + sizeof(game_state), PermanentStorageSize);
+
+		UI_Init(&GameState->PermanentArena, Pushbuffer, 128);
 
     u64 TemporaryStorageSize = Memory->TemporaryStorageSize;
     Arena_Create(&GameState->TemporaryArena, Memory->TemporaryStorage, TemporaryStorageSize);
@@ -898,8 +901,8 @@ GAME_UPDATE(GameUpdate)
 
     // Define screen space
     UI_FillHeight()
-    UI_PrefWidth(0.6f)
-    UI_ChildLayoutAxis(Axis2_Y)
+		UI_PrefSize(V2f(0.6f, 1.0f))
+		UI_ChildLayoutAxis(Axis2_Y)
     UI_Padding(0.15f)
     {
 
@@ -909,8 +912,8 @@ GAME_UPDATE(GameUpdate)
       }
 
       // Three main buttons
-      UI_PrefWidth(0.8f)
-      UI_PrefHeight(0.15f)
+
+      UI_PrefSize(V2f(0.8f, 0.15f))
       UI_Padding(0.1f)
       {
         if(UI_Button("START").Flags & UI_SignalFlag_LeftClicked)
