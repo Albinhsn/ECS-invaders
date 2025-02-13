@@ -1,19 +1,95 @@
-#include "win32_renderer_gl.h"
+#include "win32_renderer_d3d.h"
 #include "pushbuffer.c"
 #include "vector.c"
 #include "common.h"
-#include "wingdi.h"
-#include "opengl.c"
-#include <gl/gl.h>
-#include <gl/glext.h>
 
-
-void* Win32_GLGetProcAddress(const char* ProcName)
+void Win32_Deallocate(void* Memory, u64 Size)
 {
-  return (void*)wglGetProcAddress((LPCSTR)ProcName);
+  VirtualFree(Memory, Size, MEM_DECOMMIT);
 }
 
-shader Win32_GetShaderByName(win32_renderer_gl * Renderer, const char * Name)
+static void* Win32_Allocate(u64 size)
+{
+  // ToDo Align the memory?
+  return VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+}
+
+void Win32_MapU32ColorToF32(f32 * Output, u32 Color)
+{
+  Output[3]     = ((Color >> 24) & 255) / 255.0f;
+  Output[0]     = ((Color >> 16) & 255) / 255.0f;
+  Output[1]     = ((Color >> 8) & 255) / 255.0f;
+  Output[2]     = ((Color >> 0) & 255) / 255.0f;
+}
+
+bool Win32_ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Size)
+{
+
+  DWORD  dwBytesRead = 0;
+
+  HANDLE hFile       = CreateFile(Filename,              //
+                                  GENERIC_READ,          //
+                                  FILE_SHARE_READ,       //
+                                  NULL,                  //
+                                  OPEN_EXISTING,         //
+                                  FILE_ATTRIBUTE_NORMAL, //
+                                  NULL                   //
+        );
+
+  if (hFile == INVALID_HANDLE_VALUE)
+  {
+    return false;
+  }
+
+  u32        FileSize          = GetFileSize(hFile, NULL);
+  u8*        Buffer            = (u8*)Arena_Allocate(Arena, FileSize + 1);
+
+  DWORD      NumberOfBytesRead = 0;
+  OVERLAPPED ol                = {};
+
+  s32        Result            = ReadFile(hFile, Buffer, FileSize, &NumberOfBytesRead, &ol);
+  DWORD      Error             = GetLastError();
+  if (Result == false || FileSize != NumberOfBytesRead)
+  {
+    Arena_Deallocate(Arena, FileSize + 1);
+    return false;
+  }
+  Buffer[FileSize] = '\0';
+  *FileBuffer      = Buffer;
+  *Size            = FileSize;
+
+  CloseHandle(hFile);
+
+  return true;
+}
+
+d3d_texture * Win32_GetTexture(win32_renderer_d3d * Renderer, texture * Texture)
+{
+  for(u32 TextureIndex = 0; TextureIndex < Renderer->TextureCount; TextureIndex++)
+  {
+    d3d_texture * GLTexture = &Renderer->Textures[TextureIndex];
+    if(String_Compare(&GLTexture->Name, &Texture->Name))
+    {
+      return GLTexture;
+    }
+  }
+  Assert(Renderer->TextureCount < ArrayCount(Renderer->Textures));
+  // ToDo Create texture
+  d3d_texture * NewTexture = &Renderer->Textures[Renderer->TextureCount++];
+  NewTexture->Name = Texture->Name;
+
+  return NewTexture;
+}
+
+vec2f Win32_TransformSSToCS(win32_renderer_d3d * Renderer, vec2f v)
+{
+  v.X = (v.X / (f32)Renderer->ScreenWidth * 2.0f - 1.0f);
+  v.Y = -(v.Y / (f32)Renderer->ScreenHeight * 2.0f - 1.0f);
+
+  return v;
+}
+
+shader Win32_GetShaderByName(win32_renderer_d3d * Renderer, const char * Name)
 {
   string NameString = {};
   NameString.Buffer = (u8*)Name;
@@ -30,59 +106,7 @@ shader Win32_GetShaderByName(win32_renderer_gl * Renderer, const char * Name)
   return (shader){};
 }
 
-void Win32_MapU32ColorToF32(f32 * Output, u32 Color)
-{
-  Output[3]     = ((Color >> 24) & 255) / 255.0f;
-  Output[0]     = ((Color >> 16) & 255) / 255.0f;
-  Output[1]     = ((Color >> 8) & 255) / 255.0f;
-  Output[2]     = ((Color >> 0) & 255) / 255.0f;
-}
-
-vec2f Win32_TransformSSToCS(win32_renderer_gl * Renderer, vec2f v)
-{
-  v.X = (v.X / (f32)Renderer->ScreenWidth * 2.0f - 1.0f);
-  v.Y = -(v.Y / (f32)Renderer->ScreenHeight * 2.0f - 1.0f);
-
-  return v;
-}
-
-gl_texture * Win32_GetTexture(win32_renderer_gl * Renderer, texture * Texture)
-{
-  for(u32 TextureIndex = 0; TextureIndex < Renderer->TextureCount; TextureIndex++)
-  {
-    gl_texture * GLTexture = &Renderer->Textures[TextureIndex];
-    if(String_Compare(&GLTexture->Name, &Texture->Name))
-    {
-      return GLTexture;
-    }
-  }
-  Assert(Renderer->TextureCount < ArrayCount(Renderer->Textures));
-  gl_texture * NewTexture = &Renderer->Textures[Renderer->TextureCount++];
-  NewTexture->Name = Texture->Name;
-  glGenTextures(1, &NewTexture->ID);
-  glBindTexture(GL_TEXTURE_2D, NewTexture->ID);
-
-  for(u32 SampleIndex = 0; SampleIndex < Texture->Width * Texture->Height; SampleIndex++)
-  {
-    u32 Color = ((u32*)Texture->Memory)[SampleIndex];
-    u8 A     = ((Color >> 24) & 255);
-    u8 R     = ((Color >> 16) & 255);
-    u8 G     = ((Color >> 8) & 255);
-    u8 B     = ((Color >> 0) & 255);
-    ((u32*)Texture->Memory)[SampleIndex] = (
-      ((u32)A << 24) |
-      ((u32)B << 16) |
-      ((u32)G << 8)  |
-      ((u32)R << 0)
-    );
-  }
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Texture->Width, Texture->Height, 0, GL_RGBA, GL_UNSIGNED_BYTE, Texture->Memory);
-  glGenerateMipmap(GL_TEXTURE_2D);
-
-  return NewTexture;
-}
-
-void Win32_Render(win32_renderer_gl * Renderer, pushbuffer* Pushbuffer)
+void Win32_Render(win32_renderer_d3d * Renderer, pushbuffer* Pushbuffer)
 {
   while(Pushbuffer->ReadOffset < Pushbuffer->AllocatedOffset)
   {
@@ -97,11 +121,18 @@ void Win32_Render(win32_renderer_gl * Renderer, pushbuffer* Pushbuffer)
         f32 R     = ((Color >> 16) & 255) / 255.0f;
         f32 G     = ((Color >> 8) & 255) / 255.0f;
         f32 B     = ((Color >> 0) & 255) / 255.0f;
-        glClearColor(R, G, B, A);
+        vec4f ColorV4 = V4f(R, G, B, A); 
+        Renderer->Context->lpVtbl->ClearRenderTargetView(
+          Renderer->Context,
+          Renderer->RenderTargetView,
+          (float*)&ColorV4);
         break;
       }
       case Pushbuffer_Entry_Text:
       {
+
+        Pushbuffer_Read(Pushbuffer, pushbuffer_entry_text);
+          #if false
         pushbuffer_entry_text Entry = Pushbuffer_Read(Pushbuffer, pushbuffer_entry_text);
         shader Shader = Win32_GetShaderByName(Renderer, "text");
         glUseProgram(Shader.ID);
@@ -198,10 +229,13 @@ void Win32_Render(win32_renderer_gl * Renderer, pushbuffer* Pushbuffer)
         glDrawElements(GL_TRIANGLES, NumberOfIndices, GL_UNSIGNED_INT, 0);
 
         Arena_Deallocate(&Renderer->Arena, GlyphBufferSize + sizeof(u32) * NumberOfIndices);
+          #endif
         break;
       }
       case Pushbuffer_Entry_Rect_Color:
       {
+         Pushbuffer_Read(Pushbuffer, pushbuffer_entry_rect_color);
+          #if false
         pushbuffer_entry_rect_color Entry = Pushbuffer_Read(Pushbuffer, pushbuffer_entry_rect_color);
         shader Shader = Win32_GetShaderByName(Renderer, "quad");
 
@@ -247,10 +281,13 @@ void Win32_Render(win32_renderer_gl * Renderer, pushbuffer* Pushbuffer)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Renderer->EBOQ);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
+        #endif
         break;
       }
       case Pushbuffer_Entry_Rect_Texture:
       {
+        Pushbuffer_Read(Pushbuffer, pushbuffer_entry_rect_texture);
+          #if false
         pushbuffer_entry_rect_texture Entry = Pushbuffer_Read(Pushbuffer, pushbuffer_entry_rect_texture);
         shader Shader = Win32_GetShaderByName(Renderer, "texture");
 
@@ -302,142 +339,70 @@ void Win32_Render(win32_renderer_gl * Renderer, pushbuffer* Pushbuffer)
         // Draw it baby
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Renderer->EBOT);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+        #endif
         break;
       }
     }
   }
 }
 
-bool Win32_ReadFile(arena* Arena, const char* Filename, u8** FileBuffer, u32* Size)
-{
-
-  DWORD  dwBytesRead = 0;
-
-  HANDLE hFile       = CreateFile(Filename,              //
-                                  GENERIC_READ,          //
-                                  FILE_SHARE_READ,       //
-                                  NULL,                  //
-                                  OPEN_EXISTING,         //
-                                  FILE_ATTRIBUTE_NORMAL, //
-                                  NULL                   //
-        );
-
-  if (hFile == INVALID_HANDLE_VALUE)
-  {
-    return false;
-  }
-
-  u32        FileSize          = GetFileSize(hFile, NULL);
-  u8*        Buffer            = (u8*)Arena_Allocate(Arena, FileSize + 1);
-
-  DWORD      NumberOfBytesRead = 0;
-  OVERLAPPED ol                = {};
-
-  s32        Result            = ReadFile(hFile, Buffer, FileSize, &NumberOfBytesRead, &ol);
-  DWORD      Error             = GetLastError();
-  if (Result == false || FileSize != NumberOfBytesRead)
-  {
-    Arena_Deallocate(Arena, FileSize + 1);
-    return false;
-  }
-  Buffer[FileSize] = '\0';
-  *FileBuffer      = Buffer;
-  *Size            = FileSize;
-
-  CloseHandle(hFile);
-
-  return true;
-}
-
-
-void Win32_Deallocate(void* Memory, u64 Size)
-{
-  VirtualFree(Memory, Size, MEM_DECOMMIT);
-}
-
-static void* Win32_Allocate(u64 size)
-{
-  // ToDo Align the memory?
-  return VirtualAlloc(0, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-}
-
-
 void BeginFrame(platform_renderer * PlatformRenderer, pushbuffer * Pushbuffer)
 {
-  Pushbuffer_Reset(Pushbuffer);
-  glClear(GL_COLOR_BUFFER_BIT);
+  win32_renderer_d3d * Renderer = (win32_renderer_d3d*)PlatformRenderer;
+
+  RECT Rect;
+  GetClientRect(Renderer->hwnd, &Rect);
+  D3D11_VIEWPORT Viewport = {
+    0, 0,
+    (float) (Rect.right - Rect.left),
+    (float)(Rect.bottom - Rect.top),
+    0,
+    1.0f
+  };
+  Renderer->Context->lpVtbl->RSSetViewports(Renderer->Context, 1, &Viewport);
+  Renderer->SwapChain->lpVtbl->Present(Renderer->SwapChain, 1, 0);
+
 }
 
 void EndFrame(platform_renderer * PlatformRenderer, pushbuffer * Pushbuffer)
 {
-  win32_renderer_gl * Renderer = (win32_renderer_gl*)PlatformRenderer;
+
+  win32_renderer_d3d * Renderer = (win32_renderer_d3d*)PlatformRenderer;
   Win32_Render(Renderer, Pushbuffer);
-
-  HDC hdc = GetDC(Renderer->hwnd);
-  SwapBuffers(hdc);
-  ReleaseDC(Renderer->hwnd, hdc);
 }
 
-typedef struct win32_shader_program_input
+ID3DBlob * Win32_CompileShader(string Location, const char * Main, const char * Profile)
 {
-  string *ShaderSource;
-  GLenum ShaderType;
-} win32_shader_program_input;
 
-bool Win32_TestProgramLinking(u32 ID)
-{
-  s32 Result;
-  glGetProgramiv(ID, GL_LINK_STATUS, &Result);
+  ID3DBlob* Blob = 0;
+  ID3DBlob *Error = 0;
 
-  return Result;
-}
-bool Win32_TestShaderCompilation(u32 ID)
-{
-  s32 Result;
-  glGetShaderiv(ID, GL_COMPILE_STATUS, &Result);
-  if(Result == false)
+  HRESULT Result = D3DCompileFromFile(
+    (LPCWSTR)Location.Buffer, 0, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+    Main,
+    Profile,
+    0,
+    0,
+    &Blob,
+    &Error 
+  );
+  if(FAILED(Result))
   {
-    char Log[512] = {};
-    glGetShaderInfoLog(ID,ArrayCount(Log), NULL, Log);
-    OutputDebugStringA(Log);
-  }
-  return Result;
-}
-
-u32 Win32_CreateShader(win32_shader_program_input Input)
-{
-  u32 ID = glCreateShader(Input.ShaderType);
-  glShaderSource(ID, 1, (const GLchar**)&Input.ShaderSource->Buffer, (GLint*)&Input.ShaderSource->Length);
-  glCompileShader(ID);
-
-  Assert(Win32_TestShaderCompilation(ID));
-
-  return ID;
-}
-
-
-u32 Win32_CreateShaderProgram(u32 ShaderCount, ...)
-{
-  va_list ShaderInputs;
-  va_start(ShaderInputs, ShaderCount);
-  u32 ID = glCreateProgram();
-  for(u32 ShaderIndex = 0; ShaderIndex < ShaderCount; ShaderIndex++)
-  {
-    win32_shader_program_input Input = va_arg(ShaderInputs, win32_shader_program_input);
-    u32 Shader                       = Win32_CreateShader(Input);
-    glAttachShader(ID, Shader);
+    if(Error)
+    {
+      OutputDebugStringA((char*)Error->lpVtbl->GetBufferPointer(Error));
+      Error->lpVtbl->Release(Error);
+    }
+    Assert(false);
   }
 
-  va_end(ShaderInputs);
-  glLinkProgram(ID);
-
-  Assert(Win32_TestProgramLinking(ID));
-  return ID;
+  return Blob;
 }
 
-void Win32_LoadShaders(win32_renderer_gl * Renderer)
+
+void Win32_LoadShaders(win32_renderer_d3d * Renderer)
 {
-  const char * ShaderLocation = "../assets/shaders.txt";
+  const char * ShaderLocation = "../assets/shadersd3d.txt";
 
 
   file_buffer Buffer = {};
@@ -455,34 +420,22 @@ void Win32_LoadShaders(win32_renderer_gl * Renderer)
     string VertexLocation = {};
     FileBuffer_ParseString(&Buffer, &VertexLocation);
 
-    string VertexSource = {};
-    u8 C  = Buffer.Buffer[Buffer.Index];
-    Buffer.Buffer[Buffer.Index] = '\0';
-    Result = Win32_ReadFile(&Renderer->Arena, (const char*)VertexLocation.Buffer, &VertexSource.Buffer, &VertexSource.Length);
-    Assert(Result);
-    Buffer.Buffer[Buffer.Index] = C;
-
-    // Parse frag
-    FileBuffer_SkipWhitespace(&Buffer);
-    string FragLocation = {};
-    FileBuffer_ParseString(&Buffer, &FragLocation);
-
-    string FragSource = {};
-    C  = Buffer.Buffer[Buffer.Index];
-    Buffer.Buffer[Buffer.Index] = '\0';
-    Result = Win32_ReadFile(&Renderer->Arena, (const char*)FragLocation.Buffer, &FragSource.Buffer, &FragSource.Length);
-    Assert(Result);
-    Buffer.Buffer[Buffer.Index] = C;
-
-    win32_shader_program_input Input[2] = {};
-    Input[0].ShaderSource               = &VertexSource;
-    Input[0].ShaderType                 = GL_VERTEX_SHADER;
-    Input[1].ShaderSource               = &FragSource;
-    Input[1].ShaderType                 = GL_FRAGMENT_SHADER;
-    u32 ID = Win32_CreateShaderProgram(2, &Input[0], &Input[1]);
 
     shader Shader = {};
-    Shader.ID     = ID;
+    ID3DBlob* Blob = Win32_CompileShader(VertexLocation, "vs_main", "vs_5_0");
+    Result = Renderer->Device->lpVtbl->CreateVertexShader(
+      Renderer->Device, Blob->lpVtbl->GetBufferPointer(Blob),
+      Blob->lpVtbl->GetBufferSize(Blob), NULL,
+      &Shader.Vertex
+    );
+
+    Blob = Win32_CompileShader(VertexLocation, "ps_main", "ps_5_0");
+    Result = Renderer->Device->lpVtbl->CreatePixelShader(
+      Renderer->Device, Blob->lpVtbl->GetBufferPointer(Blob),
+      Blob->lpVtbl->GetBufferSize(Blob), NULL,
+      &Shader.Pixel
+    );
+
     Shader.Name   = Name;
     Assert(Renderer->ShaderCount < ArrayCount(Renderer->Shaders));
     Renderer->Shaders[Renderer->ShaderCount++] = Shader;
@@ -490,98 +443,19 @@ void Win32_LoadShaders(win32_renderer_gl * Renderer)
   }
 
 }
-void InitTextVertexArray(win32_renderer_gl * Renderer)
+
+
+void InitTextureVertexArray(win32_renderer_d3d *Renderer)
 {
-  glGenVertexArrays(1, &Renderer->VAOText);
-  glGenBuffers(1, &Renderer->VBOText);
-  glGenBuffers(1, &Renderer->EBOText);
-
-  glBindVertexArray(Renderer->VAOText);
-  // Don't remember why you have to do this..
-  // It's like the object isn't initialized until something
-  // so you have to just dump data here?
-  glBindBuffer(GL_ARRAY_BUFFER, Renderer->VBOText);
-  f32 TokenVertices[8] =
-  {
-    1.0f, 1.0f,
-    1.0f, -1.0f,
-    -1.0f, -1.0f,
-    -1.0f, 1.0f
-  };
-  glBufferData(GL_ARRAY_BUFFER, sizeof(f32) * 8, TokenVertices, GL_DYNAMIC_DRAW);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Renderer->EBOText);
-  u32 Indices[6] = {0,1,2,0,2,3};
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * ArrayCount(Indices), Indices, GL_STATIC_DRAW);
-
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(f32) * 4, (void*)(0));
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(f32) * 4, (void*)(sizeof(f32) * 2));
-  glEnableVertexAttribArray(0);
-  glEnableVertexAttribArray(1);
-  glBindVertexArray(0);
+  shader Shader = Win32_GetShaderByName("texture");
 }
-
-void InitQuadVertexArray(win32_renderer_gl * Renderer)
+void InitQuadVertexArray(win32_renderer_d3d *Renderer)
 {
-  glGenVertexArrays(1, &Renderer->VAOQ);
-  glGenBuffers(1, &Renderer->VBOQ);
-  glGenBuffers(1, &Renderer->EBOQ);
-
-  glBindVertexArray(Renderer->VAOQ);
-  // Don't remember why you have to do this..
-  // It's like the object isn't initialized until something
-  // so you have to just dump data here?
-  glBindBuffer(GL_ARRAY_BUFFER, Renderer->VBOQ);
-  f32 TokenVertices[8] =
-  {
-    1.0f, 1.0f,
-    1.0f, -1.0f,
-    -1.0f, -1.0f,
-    -1.0f, 1.0f
-  };
-  glBufferData(GL_ARRAY_BUFFER, sizeof(f32) * 8, TokenVertices, GL_DYNAMIC_DRAW);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Renderer->EBOQ);
-  u32 Indices[6] = {0,1,2,0,2,3};
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * ArrayCount(Indices), Indices, GL_STATIC_DRAW);
-
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(f32) * 2, (void*)(0));
-  glEnableVertexAttribArray(0);
-  glBindVertexArray(0);
+  shader Shader = Win32_GetShaderByName("quad");
 }
-
-void InitTextureVertexArray(win32_renderer_gl * Renderer)
+void InitTextVertexArray(win32_renderer_d3d *Renderer)
 {
-  glGenVertexArrays(1, &Renderer->VAOT);
-  glGenBuffers(1, &Renderer->VBOT);
-  glGenBuffers(1, &Renderer->EBOT);
-
-  glBindVertexArray(Renderer->VAOT);
-   // Don't remember why you have to do this..
-  // It's like the object isn't initialized until something
-  // so you have to just dump data here?
-  glBindBuffer(GL_ARRAY_BUFFER, Renderer->VBOT);
-  f32 TokenVertices[16] =
-  {
-    1.0f, 1.0f,
-    1.0f, 1.0f,
-    1.0f, -1.0f,
-    1.0f, 0.0f,
-    -1.0f, -1.0f,
-    0.0f, 0.0f,
-    -1.0f, 1.0f,
-    0.0f, 1.0f
-  };
-
-  glBufferData(GL_ARRAY_BUFFER, sizeof(f32) * 16, TokenVertices, GL_DYNAMIC_DRAW);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, Renderer->EBOT);
-  u32 Indices[6] = {0,1,2,0,2,3};
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(u32) * ArrayCount(Indices), Indices, GL_STATIC_DRAW);
-
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(f32) * 4, (void*)(0));
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(f32) * 4, (void*)(2 * sizeof(f32)));
-  glEnableVertexAttribArray(0);
-  glEnableVertexAttribArray(1);
-
-  glBindVertexArray(0);
+  shader Shader = Win32_GetShaderByName("text");
 }
 
 platform_renderer * CreateRenderer(u32 ScreenWidth, u32 ScreenHeight, void * Window)
@@ -589,55 +463,72 @@ platform_renderer * CreateRenderer(u32 ScreenWidth, u32 ScreenHeight, void * Win
   HWND hwnd = (HWND)Window;
   HDC hdc = GetDC(hwnd);
 
-  PIXELFORMATDESCRIPTOR Format  ={};
-  Format.nSize = sizeof(Format);
-  Format.nVersion = 1;
-  Format.dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER;
-  Format.iPixelType = PFD_TYPE_RGBA;
-  Format.cColorBits = 24;
-  Format.cDepthBits = 32;
-  Format.iLayerType = PFD_MAIN_PLANE;
+  ID3D11Device * Device = 0;
+  ID3D11DeviceContext * Context = 0;
+  IDXGISwapChain * SwapChain = 0;
+  ID3D11RenderTargetView* RenderTargetView = 0;
 
-  int PixelFormat = ChoosePixelFormat(hdc, &Format);
-  SetPixelFormat(hdc, PixelFormat, &Format);
+  DXGI_SWAP_CHAIN_DESC SwapChainDescription = {0};
+  SwapChainDescription.BufferDesc.RefreshRate.Numerator = 0;
+  SwapChainDescription.BufferDesc.RefreshRate.Denominator = 1;
+  SwapChainDescription.BufferDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+  SwapChainDescription.SampleDesc.Count   = 1;
+  SwapChainDescription.SampleDesc.Quality = 0;
+  SwapChainDescription.BufferUsage  = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+  SwapChainDescription.BufferCount  = 1;
+  SwapChainDescription.OutputWindow = hwnd;
+  SwapChainDescription.Windowed       = true;
+
+
+  D3D_FEATURE_LEVEL FeatureLevel;
+  u32 Flags = D3D11_CREATE_DEVICE_SINGLETHREADED | D3D11_CREATE_DEVICE_DEBUG;
+
+  HRESULT Result = D3D11CreateDeviceAndSwapChain(
+    0,
+    D3D_DRIVER_TYPE_HARDWARE,
+    0,
+    Flags,
+    0,
+    0,
+    D3D11_SDK_VERSION,
+    &SwapChainDescription,
+    &SwapChain,
+    &Device,
+    &FeatureLevel,
+    &Context);
+
+  Assert(SUCCEEDED(Result) && SwapChain && Device && Context);
+
+
+  ID3D11Texture2D * Framebuffer;
+  Result = SwapChain->lpVtbl->GetBuffer(SwapChain, 0, &IID_ID3D11Texture2D, (void**)&Framebuffer);
+  Assert(SUCCEEDED(Result));
+  Result = Device->lpVtbl->CreateRenderTargetView(Device, (ID3D11Resource*)Framebuffer, 0, &RenderTargetView);
+  Assert(SUCCEEDED(Result));
+  Framebuffer->lpVtbl->Release(Framebuffer);
 
   u64 ArenaSize = Megabyte(1);
-  win32_renderer_gl *Renderer = Win32_Allocate(sizeof(win32_renderer_gl) + ArenaSize);
-  Renderer->hwnd    = hwnd;
-  Renderer->Context = wglCreateContext(hdc);
-  Renderer->ScreenWidth   = ScreenWidth;
-  Renderer->ScreenHeight  = ScreenHeight;
+  win32_renderer_d3d *Renderer = Win32_Allocate(sizeof(win32_renderer_d3d) + ArenaSize);
   Renderer->Arena.Size    = ArenaSize;
-  Renderer->Arena.Memory  = (u8*)Renderer + sizeof(win32_renderer_gl);
-
-  wglMakeCurrent(hdc, Renderer->Context);
-
-  #if 0
-  s32 MajorVersion, MinorVersion;
-  glGetIntegerv(GL_MAJOR_VERSION, &MajorVersion);
-  glGetIntegerv(GL_MINOR_VERSION, &MinorVersion);
-  #endif
-
-  GL_LoadExtensions(Win32_GLGetProcAddress);
+  Renderer->Arena.Memory  = (u8*)Renderer + sizeof(win32_renderer_d3d);
+  Renderer->Device = Device;
+  Renderer->Context = Context;
+  Renderer->SwapChain = SwapChain;
+  Renderer->RenderTargetView = RenderTargetView;
+  Renderer->hwnd = hwnd;
+  Renderer->ScreenWidth = ScreenWidth;
+  Renderer->ScreenHeight = ScreenHeight;
 
   Win32_LoadShaders(Renderer);
 
-
-  InitQuadVertexArray(Renderer);
   InitTextureVertexArray(Renderer);
+  InitQuadVertexArray(Renderer);
   InitTextVertexArray(Renderer);
 
-  ReleaseDC(hwnd, hdc);
 
   return (platform_renderer*)Renderer;
 }
 
 void ReleaseRenderer(platform_renderer * PlatformRenderer)
 {
-  win32_renderer_gl * Renderer = (win32_renderer_gl*)PlatformRenderer;
-  wglMakeCurrent(NULL, NULL);
-  wglDeleteContext(Renderer->Context);
-  DestroyWindow(Renderer->hwnd);
-
-  Win32_Deallocate(Renderer, Renderer->Arena.Size + sizeof(win32_renderer_gl));
 }

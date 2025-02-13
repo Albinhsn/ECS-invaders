@@ -28,5 +28,8 @@ vec2i V2i(u32 X, u32 Y){
 vec2f V2f(f32 X, f32 Y){
   return (vec2f){X, Y};
 }
+vec4f V4f(f32 X, f32 Y, f32 Z, f32 W){
+  return (vec4f){X, Y, Z, W};
+}
 
 #endif

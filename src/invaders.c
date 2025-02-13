@@ -890,6 +890,7 @@ GAME_UPDATE(GameUpdate)
     Memory->IsInitialized = true;
   }
 
+  #if false
   switch (GameState->State)
   {
   case GameState_MainMenu:
@@ -984,7 +985,8 @@ GAME_UPDATE(GameUpdate)
     break;
   }
   }
-  UI_EndFrame();
+#endif
+  SimulateGame(GameState, Memory, Input, Pushbuffer);
 }
 
 GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)

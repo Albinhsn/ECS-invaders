@@ -1,0 +1,6 @@
+quad
+../shaders/quad.hlsl
+texture
+../shaders/texture.hlsl
+text
+../shaders/text.hlsl

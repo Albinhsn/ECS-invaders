@@ -2,12 +2,8 @@
 #define WIN32_RENDERER_OPENGL
 
 
-#include "renderer_software.h"
 #include "windows.h"
 #include "platform.h"
-
-// Shader
-// Textures
 
 typedef struct shader
 {

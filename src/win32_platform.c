@@ -23,6 +23,8 @@ static const char*             GlobalGameCodePath = "../build/invaders.dll";
 static const char*             GlobalRenderCodePath = "../build/win32_renderer_software.dll";
 #elif RENDERER_GL
 static const char*             GlobalRenderCodePath = "../build/win32_renderer_gl.dll";
+#elif RENDERER_D3D
+static const char*             GlobalRenderCodePath = "../build/win32_renderer_d3d.dll";
 #endif
 
 static win32_thread            GlobalAudioThread;
